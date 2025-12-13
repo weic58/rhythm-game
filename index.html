@@ -26,274 +26,150 @@
             user-select: none;
         }
 
-        /* 通用按鈕樣式 */
+        /* 按鈕樣式 */
         .icon-btn {
-            background: white;
-            border: 2px solid #ddd;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            font-size: 1.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: white; border: 2px solid #ddd; width: 50px; height: 50px;
+            border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: transform 0.1s;
         }
         .icon-btn:active { transform: scale(0.9); }
-        .icon-btn:hover { background: #f0f0f0; }
 
         .btn-primary {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 30px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
-            transition: 0.2s;
+            background-color: var(--primary-color); color: white; border: none;
+            padding: 12px 30px; border-radius: 30px; font-size: 1.5rem; font-weight: bold;
+            cursor: pointer; box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4); transition: 0.2s;
         }
         .btn-primary:hover { transform: translateY(-2px); }
 
         .btn-upload {
-            background-color: var(--secondary-color);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(46, 213, 115, 0.4);
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            width: 100%;
-            justify-content: center;
+            background-color: var(--secondary-color); color: white; border: none;
+            padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
+            cursor: pointer; width: 100%; margin-top: 5px;
         }
-        .btn-upload:hover { transform: translateY(-1px); }
 
-        /* --- 主畫面 (Home) --- */
+        .btn-danger {
+            background-color: #ff6b6b; color: white; border: none; padding: 5px 10px;
+            border-radius: 5px; font-size: 0.8rem; cursor: pointer; margin-top: 5px;
+        }
+
+        /* 主畫面 */
         #home-screen {
-            text-align: center;
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
+            text-align: center; position: relative; width: 100%; max-width: 500px;
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
         }
-
-        #settings-trigger {
-            position: absolute;
-            top: -80px;
-            right: 20px;
-        }
-
+        #settings-trigger { position: absolute; top: -80px; right: 20px; }
         h1 { font-size: 2.5rem; color: #333; margin-bottom: 5px; }
 
+        /* 設定選單 */
         .theme-selector {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-            width: 80%;
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05); width: 80%;
         }
-
         select {
-            padding: 10px;
-            font-size: 1.2rem;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            width: 100%;
-            margin-top: 5px;
+            padding: 10px; font-size: 1.2rem; border-radius: 8px;
+            border: 1px solid #ccc; width: 100%; margin-top: 5px;
         }
 
-        /* --- 設定彈窗 (Modal) --- */
+        /* 彈窗 */
         #settings-modal {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--modal-bg);
-            z-index: 100;
-            display: none;
-            align-items: center;
-            justify-content: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-bg); z-index: 100; display: none;
+            align-items: center; justify-content: center;
         }
-
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 420px;
-            max-height: 85vh;
-            overflow-y: auto;
-            position: relative;
-            animation: popUp 0.3s ease;
+            background: white; padding: 30px; border-radius: 20px;
+            width: 90%; max-width: 420px; max-height: 85vh; overflow-y: auto;
+            position: relative; animation: popUp 0.3s ease;
         }
-
         @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #f1f2f6;
-            padding-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; border-bottom: 2px solid #f1f2f6; padding-bottom: 10px;
         }
-
-        .close-btn {
-            background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888;
-        }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; }
 
         .control-group {
-            margin-bottom: 15px;
-            text-align: left;
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 10px;
+            margin-bottom: 15px; text-align: left; background: #f8f9fa;
+            padding: 12px; border-radius: 10px;
         }
         .control-group label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-        .control-group input[type="file"] { font-size: 0.9rem; width: 100%; }
-        .control-group input[type="range"] { width: 100%; cursor: pointer; }
-        .control-group input[type="number"] { padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;}
+        input[type="range"], input[type="number"] { width: 100%; padding: 5px; }
         
-        #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all;}
+        #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all; }
         #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
 
-        /* --- 遊戲畫面 --- */
+        /* 遊戲畫面 */
         #game-screen {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-            max-width: 800px;
-            position: relative;
+            display: none; flex-direction: column; align-items: center;
+            width: 100%; max-width: 800px; position: relative;
         }
-
         .top-bar {
-            position: absolute;
-            top: -80px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 20px;
-            box-sizing: border-box;
+            position: absolute; top: -80px; width: 100%; display: flex;
+            justify-content: space-between; padding: 0 20px; box-sizing: border-box;
         }
-
         .top-right-controls { display: flex; gap: 10px; }
-
         #info-bar {
-            font-size: 2rem;
-            margin-bottom: 20px;
-            font-weight: 900;
-            color: #555;
-            background: white;
-            padding: 5px 20px;
-            border-radius: 20px;
+            font-size: 2rem; margin-bottom: 20px; font-weight: 900; color: #555;
+            background: white; padding: 5px 20px; border-radius: 20px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
-
         #grid-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(2, 1fr);
-            gap: 15px;
-            width: 95%;
-            aspect-ratio: 2/1;
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 1fr); gap: 15px; width: 95%; aspect-ratio: 2/1;
         }
-
         .card {
-            background-color: var(--box-bg);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 4rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border: 5px solid #eee;
-            transition: transform 0.1s;
-            overflow: hidden;
+            background-color: var(--box-bg); border-radius: 12px; display: flex;
+            align-items: center; justify-content: center; font-size: 4rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 5px solid #eee;
+            transition: transform 0.1s; overflow: hidden;
         }
-
-        .card img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            pointer-events: none;
-        }
-        
+        .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
         .card.contain-img img { object-fit: contain; width: 90%; height: 90%; }
-
         .card.chinese-mode { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; color: #d63031; }
         .card.math-mode { font-family: 'Times New Roman', serif; font-weight: bold; color: #0984e3; }
-
         .card.active {
-            border-color: var(--primary-color) !important;
-            border-width: 6px !important;
-            transform: scale(1.05);
-            box-shadow: 0 0 30px rgba(255, 71, 87, 0.8);
-            z-index: 5;
+            border-color: var(--primary-color) !important; transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.8); z-index: 5;
         }
-
         .card.active:not(.color-card) { background-color: #ffeaa7; }
 
-        /* 暫停遮罩 */
+        /* 遮罩 */
         #pause-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 50;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 50; display: none;
+            align-items: center; justify-content: center; flex-direction: column;
             backdrop-filter: blur(5px);
         }
-        #pause-overlay h2 { color: white; font-size: 4rem; margin: 0 0 20px 0; letter-spacing: 5px; }
+        #pause-overlay h2 { color: white; font-size: 4rem; margin: 0 0 20px 0; }
 
-        /* 結束畫面 */
         #end-screen {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
+            display: none; flex-direction: column; align-items: center; gap: 20px;
+            background: white; padding: 40px; border-radius: 20px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.2);
         }
 
         .hidden { display: none !important; }
-
         #folder-input { display: none; }
-
     </style>
 </head>
 <body>
 
     <div id="home-screen">
         <button id="settings-trigger" class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
-        
         <h1>🎵 節奏遊戲</h1>
         
         <div class="theme-selector">
             <label style="font-weight:bold; color:#555;">選擇主題</label>
             <select id="theme-select" onchange="saveSettings()">
-                <option value="random">🎲 隨機主題 (每次換)</option>
-                <option value="mixed">🧪 大雜燴 (全部混合)</option>
-                
+                <option value="random">🎲 隨機主題</option>
+                <option value="mixed">🧪 大雜燴 (混合)</option>
                 <optgroup label="API / 連網主題">
                     <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
                     <option value="robots">🤖 機器人 (RoboHash)</option>
-                    <option value="food">🍔 療癒美食 (精選)</option>
+                    <option value="food">🍔 療癒美食</option>
                 </optgroup>
-
                 <optgroup label="內建主題">
                     <option value="math">➗ 數學符號</option>
                     <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
@@ -334,15 +210,15 @@
             </div>
 
             <div class="control-group">
-                <label>🎵 背景音樂 (自動記憶)</label>
-                <input type="file" id="music-file" accept="audio/*">
+                <label>🎵 背景音樂 (支援 .mp3, .wav)</label>
+                <input type="file" id="music-file" accept=".mp3,audio/*">
                 <div id="file-status">未選擇檔案</div>
+                <button class="btn-danger" onclick="clearMusicDB()">🗑️ 清除音樂資料 (卡住請按)</button>
             </div>
 
             <div class="control-group">
-                <label>🐢⏩ 音樂播放倍速: <span id="rate-display" style="color:#e056fd;">1.0</span>x</label>
+                <label>🐢⏩ 音樂倍速: <span id="rate-display" style="color:#e056fd;">1.0</span>x</label>
                 <input type="range" id="rate-input" min="0.5" max="2.0" step="0.1" value="1.0" oninput="saveSettings()">
-                <small style="color:#888;">*自動同步格子速度 (0.5x ~ 2.0x)</small>
             </div>
 
             <div class="control-group">
@@ -352,16 +228,16 @@
 
             <div class="control-group">
                 <label>⏯️ 音樂起點 (秒):</label>
-                <input type="number" id="offset-input" value="0" step="0.1" placeholder="正數=跳過, 負數=延遲" oninput="saveSettings()">
+                <input type="number" id="offset-input" value="0" step="0.1" oninput="saveSettings()">
             </div>
 
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
-                <input type="number" id="intro-seconds-input" value="0" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
+                <input type="number" id="intro-seconds-input" value="0" step="0.1" oninput="saveSettings()">
             </div>
 
             <div class="control-group">
-                <label>🛌 回合間隔休息 (秒):</label>
+                <label>🛌 回合間隔 (秒):</label>
                 <input type="range" id="interval-input" min="0" max="5" value="1.0" step="0.5" oninput="saveSettings()">
                 <div style="text-align:right; font-weight:bold; color:#555;"><span id="interval-display">1.0</span> 秒</div>
             </div>
@@ -378,11 +254,7 @@
                 <button class="icon-btn" onclick="restartGame()" title="重置">🔄</button>
             </div>
         </div>
-        
-        <div id="info-bar">
-            Round <span id="current-round">1</span> / <span id="total-rounds">3</span>
-        </div>
-        
+        <div id="info-bar">Round <span id="current-round">1</span> / <span id="total-rounds">3</span></div>
         <div id="grid-container"></div>
     </div>
 
@@ -390,11 +262,10 @@
         <h2>PAUSED</h2>
         <button class="btn-primary" style="width: 200px;" onclick="togglePause()">繼續</button>
     </div>
-
     <div id="end-screen">
         <h1>🎉 挑戰完成！</h1>
         <div style="display:flex; gap:20px;">
-            <button class="icon-btn" onclick="goHome()" title="回首頁">🏠</button>
+            <button class="icon-btn" onclick="goHome()">🏠</button>
             <button class="btn-primary" onclick="restartGame()">再來一次</button>
         </div>
     </div>
@@ -406,7 +277,6 @@
             numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
             colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#000000', '#ffffff', '#ff00ff', '#00ffff', '#808080', '#ffa500'],
             math: ['+','-','×','÷','=','≠','≈','>','<','π','√','∞','∫','∆','∑','Ω'],
-            // 美食精選
             food: [
                 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80',
                 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80',
@@ -428,51 +298,152 @@
         };
 
         let customData = {}; 
-
-        // --- 遊戲狀態 ---
         let gameState = {
-            round: 0,
-            maxRounds: 3,
-            theme: 'pokemon',
-            bpm: 100,
-            offset: 0,
-            interval: 1.0, 
-            introSeconds: 0,
-            playbackRate: 1.0, 
-            isPaused: false,
-            abortController: null,
-            selectedTheme: 'pokemon'
+            round: 0, maxRounds: 3, theme: 'pokemon', bpm: 100,
+            offset: 0, interval: 1.0, introSeconds: 0, playbackRate: 1.0, 
+            isPaused: false, abortController: null, selectedTheme: 'pokemon'
         };
 
         let audioCtx;
         let bgmAudio = new Audio();
         
-        // --- 2. 本地資料夾上傳邏輯 ---
+        // --- 2. 檔案處理 (強化版) ---
+        const DB_NAME = "RhythmGameDB";
+        const DB_STORE = "files";
+
+        // 資料夾上傳
         document.getElementById('folder-input').addEventListener('change', function(e) {
             const files = e.target.files;
             let count = 0;
             customData = {}; 
-
             for (let file of files) {
                 if (!file.type.startsWith('image/')) continue;
                 const pathParts = file.webkitRelativePath.split('/');
-                let themeName = "自訂相簿";
-                if (pathParts.length > 1) {
-                    themeName = pathParts[pathParts.length - 2];
-                }
+                let themeName = (pathParts.length > 1) ? pathParts[pathParts.length - 2] : "自訂相簿";
                 if (!customData[themeName]) customData[themeName] = [];
-                
-                const imgUrl = URL.createObjectURL(file);
-                customData[themeName].push(imgUrl);
+                customData[themeName].push(URL.createObjectURL(file));
                 count++;
             }
             updateThemeSelect();
-            document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片！`;
+            document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
+
+        // MP3 音樂上傳
+        document.getElementById('music-file').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // 立即顯示選擇的檔名
+            document.getElementById('file-status').innerText = `✅ 準備中: ${file.name}`;
+            
+            try {
+                // 嘗試存入 DB
+                await saveFileToDB(file);
+                // 建立播放連結
+                const url = URL.createObjectURL(file);
+                bgmAudio.src = url;
+                bgmAudio.load(); // 關鍵：強制載入
+                document.getElementById('file-status').innerText = `✅ 已就緒: ${file.name}`;
+            } catch (err) {
+                console.error("DB Error:", err);
+                // 如果 DB 失敗，至少讓現在能玩
+                bgmAudio.src = URL.createObjectURL(file);
+                document.getElementById('file-status').innerText = `⚠️ 僅暫時讀取 (無法記憶): ${file.name}`;
+            }
+        });
+
+        // 清除 DB 功能
+        async function clearMusicDB() {
+            try {
+                const req = indexedDB.deleteDatabase(DB_NAME);
+                req.onsuccess = () => {
+                    alert("已清除音樂快取，請重新整理網頁！");
+                    location.reload();
+                };
+                req.onerror = () => alert("清除失敗，請手動清除瀏覽器資料");
+            } catch(e) {
+                alert("清除錯誤");
+            }
+        }
+
+        // DB 相關函式
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e);
+            });
+        }
+
+        async function saveFileToDB(file) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(DB_STORE, "readwrite");
+                const req = tx.objectStore(DB_STORE).put(file, "bgm");
+                req.onsuccess = () => resolve();
+                req.onerror = (e) => reject(e);
+            });
+        }
+
+        async function loadFileFromDB() {
+            try {
+                const db = await initDB();
+                return new Promise((resolve) => {
+                    const tx = db.transaction(DB_STORE, "readonly");
+                    const req = tx.objectStore(DB_STORE).get("bgm");
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => resolve(null);
+                });
+            } catch(e) {
+                console.log("DB Load Error", e);
+                return null;
+            }
+        }
+
+        // --- 3. UI 與初始化 ---
+        function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
+        function closeSettingsBtn() { document.getElementById('settings-modal').style.display = 'none'; }
+        function closeSettings(e) { if(e.target.id === 'settings-modal') closeSettingsBtn(); }
+
+        function saveSettings() {
+            localStorage.setItem('rg_theme', document.getElementById('theme-select').value);
+            localStorage.setItem('rg_rounds', document.getElementById('round-select').value);
+            localStorage.setItem('rg_bpm', document.getElementById('bpm-input').value);
+            localStorage.setItem('rg_offset', document.getElementById('offset-input').value);
+            localStorage.setItem('rg_intro', document.getElementById('intro-seconds-input').value);
+            localStorage.setItem('rg_interval', document.getElementById('interval-input').value);
+            localStorage.setItem('rg_rate', document.getElementById('rate-input').value);
+            
+            document.getElementById('bpm-display').innerText = document.getElementById('bpm-input').value;
+            document.getElementById('interval-display').innerText = document.getElementById('interval-input').value;
+            document.getElementById('rate-display').innerText = document.getElementById('rate-input').value;
+        }
+
+        function loadSettings() {
+            const s = localStorage;
+            if(s.getItem('rg_rounds')) document.getElementById('round-select').value = s.getItem('rg_rounds');
+            if(s.getItem('rg_bpm')) {
+                document.getElementById('bpm-input').value = s.getItem('rg_bpm');
+                document.getElementById('bpm-display').innerText = s.getItem('rg_bpm');
+            }
+            if(s.getItem('rg_offset')) document.getElementById('offset-input').value = s.getItem('rg_offset');
+            if(s.getItem('rg_intro')) document.getElementById('intro-seconds-input').value = s.getItem('rg_intro');
+            if(s.getItem('rg_interval')) {
+                document.getElementById('interval-input').value = s.getItem('rg_interval');
+                document.getElementById('interval-display').innerText = s.getItem('rg_interval');
+            }
+            if(s.getItem('rg_rate')) {
+                document.getElementById('rate-input').value = s.getItem('rg_rate');
+                document.getElementById('rate-display').innerText = s.getItem('rg_rate');
+            }
+        }
 
         function updateThemeSelect() {
             const select = document.getElementById('theme-select');
-            
             select.innerHTML = `
                 <option value="random">🎲 隨機主題 (每次換)</option>
                 <option value="mixed">🧪 大雜燴 (全部混合)</option>
@@ -492,25 +463,20 @@
                 select.appendChild(group);
             }
 
-            const apiGroup = document.createElement('optgroup');
-            apiGroup.label = "API / 連網主題";
-            apiGroup.innerHTML = `
-                <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
-                <option value="robots">🤖 機器人 (RoboHash)</option>
-                <option value="food">🍔 療癒美食 (精選)</option>
+            select.innerHTML += `
+                <optgroup label="API / 連網主題">
+                    <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
+                    <option value="robots">🤖 機器人 (RoboHash)</option>
+                    <option value="food">🍔 療癒美食 (精選)</option>
+                </optgroup>
+                <optgroup label="內建主題">
+                    <option value="math">➗ 數學符號</option>
+                    <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
+                    <option value="animals">🦁 動物 Emoji</option>
+                    <option value="numbers">🔢 數字</option>
+                    <option value="colors">🎨 顏色</option>
+                </optgroup>
             `;
-            select.appendChild(apiGroup);
-
-            const staticGroup = document.createElement('optgroup');
-            staticGroup.label = "內建主題";
-            staticGroup.innerHTML = `
-                <option value="math">➗ 數學符號</option>
-                <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
-                <option value="animals">🦁 動物 Emoji</option>
-                <option value="numbers">🔢 數字</option>
-                <option value="colors">🎨 顏色</option>
-            `;
-            select.appendChild(staticGroup);
             
             const lastTheme = localStorage.getItem('rg_theme');
             if (lastTheme && select.querySelector(`option[value="${lastTheme}"]`)) {
@@ -518,105 +484,27 @@
             }
         }
 
-        // --- 3. 資料庫與設定 (記憶) ---
-        const DB_NAME = "RhythmGameDB";
-        const DB_STORE = "files";
-
-        function saveSettings() {
-            localStorage.setItem('rg_theme', document.getElementById('theme-select').value);
-            localStorage.setItem('rg_rounds', document.getElementById('round-select').value);
-            localStorage.setItem('rg_bpm', document.getElementById('bpm-input').value);
-            localStorage.setItem('rg_offset', document.getElementById('offset-input').value);
-            localStorage.setItem('rg_intro', document.getElementById('intro-seconds-input').value);
-            localStorage.setItem('rg_interval', document.getElementById('interval-input').value);
-            localStorage.setItem('rg_rate', document.getElementById('rate-input').value);
-            
-            document.getElementById('bpm-display').innerText = document.getElementById('bpm-input').value;
-            document.getElementById('interval-display').innerText = document.getElementById('interval-input').value;
-            document.getElementById('rate-display').innerText = document.getElementById('rate-input').value;
-        }
-
-        function loadSettings() {
-            if(localStorage.getItem('rg_rounds')) document.getElementById('round-select').value = localStorage.getItem('rg_rounds');
-            if(localStorage.getItem('rg_bpm')) {
-                document.getElementById('bpm-input').value = localStorage.getItem('rg_bpm');
-                document.getElementById('bpm-display').innerText = localStorage.getItem('rg_bpm');
-            }
-            if(localStorage.getItem('rg_offset')) document.getElementById('offset-input').value = localStorage.getItem('rg_offset');
-            if(localStorage.getItem('rg_intro')) document.getElementById('intro-seconds-input').value = localStorage.getItem('rg_intro');
-            if(localStorage.getItem('rg_interval')) {
-                document.getElementById('interval-input').value = localStorage.getItem('rg_interval');
-                document.getElementById('interval-display').innerText = localStorage.getItem('rg_interval');
-            }
-            if(localStorage.getItem('rg_rate')) {
-                document.getElementById('rate-input').value = localStorage.getItem('rg_rate');
-                document.getElementById('rate-display').innerText = localStorage.getItem('rg_rate');
-            }
-        }
-
-        async function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-                };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e);
-            });
-        }
-
-        async function saveFileToDB(file) {
-            const db = await initDB();
-            const tx = db.transaction(DB_STORE, "readwrite");
-            tx.objectStore(DB_STORE).put(file, "bgm");
-        }
-
-        async function loadFileFromDB() {
-            const db = await initDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction(DB_STORE, "readonly");
-                const req = tx.objectStore(DB_STORE).get("bgm");
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => resolve(null);
-            });
-        }
-
-        // --- 4. 介面與初始化 ---
-        function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
-        function closeSettingsBtn() { document.getElementById('settings-modal').style.display = 'none'; }
-        function closeSettings(e) { if(e.target.id === 'settings-modal') closeSettingsBtn(); }
-
-        document.getElementById('music-file').addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                bgmAudio.src = URL.createObjectURL(file);
-                document.getElementById('file-status').innerText = `✅ 已選擇: ${file.name}`;
-                await saveFileToDB(file);
-            }
-        });
-
+        // 初始化
         window.addEventListener('load', async () => {
             loadSettings();
             updateThemeSelect();
             const file = await loadFileFromDB();
             if (file) {
                 bgmAudio.src = URL.createObjectURL(file);
+                bgmAudio.load(); 
                 document.getElementById('file-status').innerText = `✅ 上次檔案: ${file.name}`;
             }
         });
 
-        // --- 5. 計時器核心 ---
+        // --- 4. 遊戲核心 ---
         class SmartTimer {
             constructor(callback, delay) {
-                this.remaining = delay;
-                this.callback = callback;
+                this.remaining = delay; this.callback = callback;
                 this.start = Date.now();
                 this.timerId = setTimeout(this.finish.bind(this), delay);
             }
             pause() {
-                window.clearTimeout(this.timerId);
-                this.timerId = null;
+                window.clearTimeout(this.timerId); this.timerId = null;
                 this.remaining -= Date.now() - this.start;
             }
             resume() {
@@ -628,23 +516,19 @@
         }
 
         function wait(ms) {
-            if (ms <= 0) return Promise.resolve(); 
+            if (ms <= 0) return Promise.resolve();
             return new Promise((resolve, reject) => {
                 const timer = new SmartTimer(resolve, ms);
                 if (!window.currentTimers) window.currentTimers = [];
                 window.currentTimers.push(timer);
-                
                 if (gameState.abortController.signal.aborted) reject(new Error("Aborted"));
                 gameState.abortController.signal.addEventListener('abort', () => {
-                    window.clearTimeout(timer.timerId);
-                    reject(new Error("Aborted"));
+                    window.clearTimeout(timer.timerId); reject(new Error("Aborted"));
                 });
             });
         }
 
-        // --- 6. 遊戲流程 ---
-
-        function startGame() {
+        async function startGame() {
             gameState.maxRounds = parseInt(document.getElementById('round-select').value);
             gameState.selectedTheme = document.getElementById('theme-select').value;
             gameState.bpm = parseInt(document.getElementById('bpm-input').value);
@@ -652,13 +536,24 @@
             gameState.interval = parseFloat(document.getElementById('interval-input').value);
             gameState.introSeconds = parseFloat(document.getElementById('intro-seconds-input').value) || 0;
             gameState.playbackRate = parseFloat(document.getElementById('rate-input').value) || 1.0;
-            
             gameState.round = 0;
             gameState.abortController = new AbortController();
             window.currentTimers = [];
 
+            // Safari Audio Unlock
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
             
+            if (bgmAudio.src) {
+                try {
+                    bgmAudio.volume = 0; 
+                    await bgmAudio.play();
+                    bgmAudio.pause();
+                    bgmAudio.currentTime = 0;
+                    bgmAudio.volume = 1; 
+                } catch (e) { console.log("Unlock failed", e); }
+            }
+
             document.getElementById('home-screen').classList.add('hidden');
             document.getElementById('end-screen').style.display = 'none';
             document.getElementById('game-screen').style.display = 'flex';
@@ -669,10 +564,9 @@
 
         function getItem(theme) {
             if (theme.startsWith('custom_')) {
-                const realThemeName = theme.replace('custom_', '');
-                if (customData[realThemeName] && customData[realThemeName].length > 0) {
-                    return customData[realThemeName][Math.floor(Math.random() * customData[realThemeName].length)];
-                }
+                const real = theme.replace('custom_', '');
+                if (customData[real] && customData[real].length > 0) 
+                    return customData[real][Math.floor(Math.random() * customData[real].length)];
                 return "❓";
             }
             if (theme === 'pokemon') {
@@ -685,114 +579,98 @@
             }
             if (theme === 'chinese_phonetic') {
                 const keys = Object.keys(chineseGroups);
-                const randomKey = keys[Math.floor(Math.random() * keys.length)];
-                return chineseGroups[randomKey][Math.floor(Math.random() * chineseGroups[randomKey].length)];
+                const k = keys[Math.floor(Math.random() * keys.length)];
+                return chineseGroups[k][Math.floor(Math.random() * chineseGroups[k].length)];
             }
-            if (commonData[theme]) {
-                return commonData[theme][Math.floor(Math.random() * commonData[theme].length)];
-            }
-            return "🐶"; 
+            if (commonData[theme]) return commonData[theme][Math.floor(Math.random() * commonData[theme].length)];
+            return "🐶";
         }
 
-        function getAllAvailableThemes() {
-            let themes = ['pokemon', 'robots', 'food', 'math', 'chinese_phonetic', 'animals', 'numbers', 'colors'];
-            for (let t in customData) {
-                themes.push('custom_' + t);
-            }
-            return themes;
+        function getAllThemes() {
+            let t = ['pokemon', 'robots', 'food', 'math', 'chinese_phonetic', 'animals', 'numbers', 'colors'];
+            for (let k in customData) t.push('custom_' + k);
+            return t;
         }
 
         async function runGameLoop() {
             try {
-                // 套用播放倍速
                 bgmAudio.playbackRate = gameState.playbackRate;
 
                 while (gameState.round < gameState.maxRounds) {
                     gameState.round++;
                     document.getElementById('current-round').innerText = gameState.round;
                     
-                    let currentRoundTheme = gameState.selectedTheme;
-                    const allThemes = getAllAvailableThemes();
+                    let curTheme = gameState.selectedTheme;
+                    const allT = getAllThemes();
+                    if (gameState.selectedTheme === 'random') curTheme = allT[Math.floor(Math.random() * allT.length)];
 
-                    if (gameState.selectedTheme === 'random') {
-                        currentRoundTheme = allThemes[Math.floor(Math.random() * allThemes.length)];
-                    }
-
-                    // A. 音樂播放
+                    // 音樂播放
                     if (bgmAudio.src) {
                         if (gameState.offset < 0) {
                             bgmAudio.currentTime = 0;
                             await wait(Math.abs(gameState.offset) * 1000);
-                            bgmAudio.play().catch(e => console.log("Audio play error", e));
+                            bgmAudio.play().catch(e=>console.log(e));
                         } else {
                             bgmAudio.currentTime = gameState.offset;
-                            bgmAudio.play().catch(e => console.log("Audio play error", e));
+                            bgmAudio.play().catch(e=>console.log(e));
                         }
                     }
 
-                    // B. 產生題目
+                    // 產生題目
                     const grid = document.getElementById('grid-container');
                     grid.innerHTML = '';
                     let items = [];
 
                     if (gameState.selectedTheme === 'mixed') {
                         for(let i=0; i<8; i++) {
-                            const randTheme = allThemes[Math.floor(Math.random() * allThemes.length)];
-                            items.push({ val: getItem(randTheme), theme: randTheme });
+                            const rt = allT[Math.floor(Math.random() * allT.length)];
+                            items.push({ val: getItem(rt), theme: rt });
                         }
                     } else {
-                        if (currentRoundTheme === 'chinese_phonetic') {
+                        // 單一主題
+                        if (curTheme === 'chinese_phonetic') {
                             const keys = Object.keys(chineseGroups);
-                            const randomKey = keys[Math.floor(Math.random() * keys.length)];
-                            const slice = chineseGroups[randomKey].sort(() => 0.5 - Math.random()).slice(0, 8);
-                            items = slice.map(v => ({ val: v, theme: 'chinese_phonetic' }));
-                        } else if (currentRoundTheme.startsWith('custom_')) {
-                            const realName = currentRoundTheme.replace('custom_', '');
-                            const pool = customData[realName];
-                            for(let i=0; i<8; i++) {
-                                items.push({ val: pool[Math.floor(Math.random() * pool.length)], theme: currentRoundTheme });
-                            }
-                        } else if (currentRoundTheme === 'pokemon' || currentRoundTheme === 'robots') {
-                             for(let i=0; i<8; i++) {
-                                items.push({ val: getItem(currentRoundTheme), theme: currentRoundTheme });
-                            }
+                            const k = keys[Math.floor(Math.random() * keys.length)];
+                            const slice = chineseGroups[k].sort(() => 0.5 - Math.random()).slice(0, 8);
+                            items = slice.map(v => ({ val: v, theme: curTheme }));
+                        } else if (curTheme.startsWith('custom_')) {
+                            const real = curTheme.replace('custom_', '');
+                            const pool = customData[real];
+                            for(let i=0; i<8; i++) items.push({ val: pool[Math.floor(Math.random()*pool.length)], theme: curTheme });
+                        } else if (['pokemon','robots'].includes(curTheme)) {
+                            for(let i=0; i<8; i++) items.push({ val: getItem(curTheme), theme: curTheme });
                         } else {
-                            const pool = commonData[currentRoundTheme] || commonData['animals'];
-                            const slice = [...pool].sort(() => 0.5 - Math.random()).slice(0, 8);
-                            items = slice.map(v => ({ val: v, theme: currentRoundTheme }));
+                            const pool = commonData[curTheme] || commonData['animals'];
+                            const slice = [...pool].sort(()=>0.5-Math.random()).slice(0,8);
+                            items = slice.map(v => ({ val: v, theme: curTheme }));
                         }
                     }
-                    
+
                     items.forEach(obj => {
-                        const item = obj.val;
-                        const th = obj.theme;
                         const card = document.createElement('div');
                         card.className = 'card';
+                        const isUrl = typeof obj.val === 'string' && (obj.val.startsWith('http') || obj.val.startsWith('blob:'));
                         
-                        const isUrl = typeof item === 'string' && (item.startsWith('http') || item.startsWith('blob:'));
-
                         if (isUrl) {
                             card.classList.add('contain-img');
-                            card.innerHTML = `<img src="${item}">`;
-                        } else if (th === 'colors') {
-                            card.style.backgroundColor = item;
+                            card.innerHTML = `<img src="${obj.val}">`;
+                        } else if (obj.theme === 'colors') {
                             card.classList.add('color-card');
-                            if(item === '#ffffff') card.style.borderColor = '#ddd';
+                            card.style.backgroundColor = obj.val;
+                            if(obj.val === '#ffffff') card.style.borderColor = '#ddd';
                         } else {
-                            card.innerText = item;
-                            if (th === 'numbers') card.classList.add('number-mode');
-                            if (th === 'math') card.classList.add('math-mode');
-                            if (th === 'chinese_phonetic') card.classList.add('chinese-mode');
+                            card.innerText = obj.val;
+                            if(obj.theme === 'numbers') card.classList.add('number-mode');
+                            if(obj.theme === 'math') card.classList.add('math-mode');
+                            if(obj.theme === 'chinese_phonetic') card.classList.add('chinese-mode');
                         }
                         grid.appendChild(card);
                     });
 
-                    // C. 等待秒數
-                    if (gameState.introSeconds > 0) {
-                        await wait(gameState.introSeconds * 1000);
-                    }
+                    // Intro Wait
+                    if (gameState.introSeconds > 0) await wait(gameState.introSeconds * 1000);
 
-                    // D. 跑格子
+                    // Run Grid
                     const msPerBeat = (60000 / gameState.bpm) / gameState.playbackRate;
                     const cards = document.querySelectorAll('.card');
                     for (let i = 0; i < 8; i++) {
@@ -800,18 +678,12 @@
                         cards[i].classList.add('active');
                         await wait(msPerBeat);
                     }
-                    if(cards.length > 0) cards[7].classList.remove('active');
+                    if(cards.length>0) cards[7].classList.remove('active');
 
-                    // E. 回合結束
                     if (bgmAudio.src) bgmAudio.pause();
-
-                    if (gameState.round < gameState.maxRounds) {
-                        await wait(gameState.interval * 1000); 
-                    }
+                    if (gameState.round < gameState.maxRounds) await wait(gameState.interval * 1000);
                 }
-                
                 showEndScreen();
-
             } catch (error) {
                 if (error.message !== "Aborted") console.error(error);
             }
@@ -824,38 +696,27 @@
             document.getElementById('home-screen').classList.add('hidden');
         }
 
-        // --- 7. 控制功能 ---
         function togglePause() {
             gameState.isPaused = !gameState.isPaused;
             const overlay = document.getElementById('pause-overlay');
             const btn = document.getElementById('pause-btn');
-            
             if (gameState.isPaused) {
-                overlay.style.display = 'flex';
-                btn.innerText = '▶️';
-                bgmAudio.pause();
-                window.currentTimers.forEach(t => t.pause());
+                overlay.style.display = 'flex'; btn.innerText = '▶️';
+                bgmAudio.pause(); window.currentTimers.forEach(t => t.pause());
             } else {
-                overlay.style.display = 'none';
-                btn.innerText = '⏸';
-                bgmAudio.play();
-                window.currentTimers.forEach(t => t.resume());
+                overlay.style.display = 'none'; btn.innerText = '⏸';
+                bgmAudio.play(); window.currentTimers.forEach(t => t.resume());
             }
         }
 
         function resetLogic() {
             if (gameState.abortController) gameState.abortController.abort();
-            bgmAudio.pause();
-            gameState.isPaused = false;
+            bgmAudio.pause(); gameState.isPaused = false;
             document.getElementById('pause-overlay').style.display = 'none';
             document.getElementById('pause-btn').innerText = '⏸';
         }
 
-        function restartGame() {
-            resetLogic();
-            setTimeout(startGame, 100);
-        }
-
+        function restartGame() { resetLogic(); setTimeout(startGame, 100); }
         function goHome() {
             resetLogic();
             document.getElementById('game-screen').style.display = 'none';
