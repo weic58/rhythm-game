@@ -2,13 +2,12 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>節奏遊戲</title>
     <style>
         :root {
             --primary-color: #ff4757;
             --secondary-color: #2ed573;
-            --link-color: #54a0ff;
             --bg-color: #f1f2f6;
             --box-bg: #ffffff;
             --modal-bg: rgba(0, 0, 0, 0.6);
@@ -25,9 +24,10 @@
             margin: 0;
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none; /* Safari 專用 */
         }
 
-        /* 通用按鈕樣式 */
+        /* 通用按鈕 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -47,6 +47,11 @@
             background-color: var(--secondary-color); color: white; border: none;
             padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
             cursor: pointer; width: 100%; margin-top: 5px;
+        }
+
+        .btn-test {
+            background-color: #54a0ff; color: white; border: none; padding: 5px 10px;
+            border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-left: 5px;
         }
 
         /* 主畫面 */
@@ -206,7 +211,7 @@
             </div>
 
             <div class="control-group">
-                <label>🎵 背景音樂 (二選一)</label>
+                <label>🎵 背景音樂</label>
                 
                 <div style="margin-bottom: 10px;">
                     <label style="font-size:0.85rem; color:#666;">1. 上傳 MP3 檔案:</label>
@@ -214,11 +219,14 @@
                 </div>
 
                 <div>
-                    <label style="font-size:0.85rem; color:#666;">2. 或貼上 Google Drive 共用連結:</label>
-                    <input type="text" id="drive-input" placeholder="https://drive.google.com/file/d/..." oninput="handleDriveLink(this.value)">
+                    <label style="font-size:0.85rem; color:#666;">2. 或貼上 Google Drive 連結:</label>
+                    <input type="text" id="drive-input" placeholder="https://drive.google.com/..." oninput="handleDriveLink(this.value)">
                 </div>
 
-                <div id="file-status" style="margin-top:8px;">未選擇檔案</div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:5px;">
+                    <span id="file-status">未選擇檔案</span>
+                    <button class="btn-test" onclick="testAudio()">🔊 試聽</button>
+                </div>
             </div>
 
             <div class="control-group">
@@ -276,7 +284,6 @@
     </div>
 
     <script>
-        // --- 1. 資料庫 ---
         const commonData = {
             animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
             numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
@@ -311,8 +318,7 @@
 
         let audioCtx;
         let bgmAudio = new Audio();
-        // 允許跨域 (針對 Drive)
-        bgmAudio.crossOrigin = "anonymous"; 
+        bgmAudio.preload = "auto"; // 強制預載
         
         const DB_NAME = "RhythmGameDB";
         const DB_STORE = "files";
@@ -338,40 +344,48 @@
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            
-            // 清空 Drive 輸入框避免混淆
             document.getElementById('drive-input').value = "";
-
+            
+            // 建立 Blob URL
             const url = URL.createObjectURL(file);
             bgmAudio.src = url;
             bgmAudio.load();
+            
             document.getElementById('file-status').innerText = `✅ 本地檔案: ${file.name}`;
-            this.value = '';
+            this.value = ''; // 允許重複選取
             
             saveFileToDB(file).catch(e => console.log("DB Skip"));
         });
 
-        // Google Drive 處理邏輯
         function handleDriveLink(url) {
             if (!url) return;
-            
-            // 嘗試提取 ID
             let id = "";
-            const parts = url.match(/[-\w]{25,}/); // 簡易 ID 匹配
+            const parts = url.match(/[-\w]{25,}/);
             if (parts) id = parts[0];
-
             if (id) {
-                // 轉換為直連網址
                 const directUrl = `https://drive.google.com/uc?export=download&id=${id}`;
                 bgmAudio.src = directUrl;
                 bgmAudio.load();
-                
-                document.getElementById('file-status').innerText = `☁️ Google Drive ID: ${id.substring(0,5)}...`;
-                document.getElementById('music-file').value = ""; // 清空本地檔案選取
-                
-                // 記憶 Drive URL
+                document.getElementById('file-status').innerText = `☁️ Google Drive: 載入中...`;
+                document.getElementById('music-file').value = "";
                 localStorage.setItem('rg_drive_url', url);
             }
+        }
+
+        // 試聽功能
+        function testAudio() {
+            if (!bgmAudio.src) {
+                alert("請先選擇檔案！");
+                return;
+            }
+            bgmAudio.volume = 1.0;
+            bgmAudio.playbackRate = parseFloat(document.getElementById('rate-input').value);
+            bgmAudio.play()
+                .then(() => {
+                    document.getElementById('file-status').innerText += " (播放中)";
+                    setTimeout(() => { bgmAudio.pause(); bgmAudio.currentTime = 0; }, 3000); // 試聽3秒
+                })
+                .catch(e => alert("播放失敗，請確認檔案格式或連結權限。\n錯誤: " + e.message));
         }
 
         function initDB() {
@@ -443,7 +457,6 @@
                 document.getElementById('rate-input').value = s.getItem('rg_rate');
                 document.getElementById('rate-display').innerText = s.getItem('rg_rate');
             }
-            // 恢復 Drive 連結
             if(s.getItem('rg_drive_url')) {
                 document.getElementById('drive-input').value = s.getItem('rg_drive_url');
                 handleDriveLink(s.getItem('rg_drive_url'));
@@ -546,9 +559,7 @@
             gameState.abortController = new AbortController();
             window.currentTimers = [];
 
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
-            
+            // 這裡非常重要：強制解鎖
             if (bgmAudio.src) {
                 try {
                     bgmAudio.volume = 0; 
@@ -556,7 +567,7 @@
                     bgmAudio.pause();
                     bgmAudio.currentTime = 0;
                     bgmAudio.volume = 1; 
-                } catch (e) { console.log("Unlock failed", e); }
+                } catch (e) { console.log("Unlock failed, trying again...", e); }
             }
 
             document.getElementById('home-screen').classList.add('hidden');
