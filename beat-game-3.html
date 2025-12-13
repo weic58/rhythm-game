@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>節奏遊戲</title>
+    <style>
+        :root {
+            --primary-color: #ff4757;
+            --secondary-color: #2ed573;
+            --bg-color: #f1f2f6;
+            --box-bg: #ffffff;
+            --modal-bg: rgba(0, 0, 0, 0.6);
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* 通用按鈕樣式 */
+        .icon-btn {
+            background: white;
+            border: 2px solid #ddd;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        .icon-btn:active { transform: scale(0.9); }
+        .icon-btn:hover { background: #f0f0f0; }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+            transition: 0.2s;
+        }
+        .btn-primary:hover { transform: translateY(-2px); }
+
+        .btn-upload {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(46, 213, 115, 0.4);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            justify-content: center;
+        }
+        .btn-upload:hover { transform: translateY(-1px); }
+
+        /* --- 主畫面 (Home) --- */
+        #home-screen {
+            text-align: center;
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #settings-trigger {
+            position: absolute;
+            top: -80px;
+            right: 20px;
+        }
+
+        h1 { font-size: 2.5rem; color: #333; margin-bottom: 5px; }
+
+        .theme-selector {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            width: 80%;
+        }
+
+        select {
+            padding: 10px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        /* --- 設定彈窗 (Modal) --- */
+        #settings-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-bg);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 420px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            animation: popUp 0.3s ease;
+        }
+
+        @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f1f2f6;
+            padding-bottom: 10px;
+        }
+
+        .close-btn {
+            background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 10px;
+        }
+        .control-group label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
+        .control-group input[type="file"] { font-size: 0.9rem; width: 100%; }
+        .control-group input[type="range"] { width: 100%; cursor: pointer; }
+        .control-group input[type="number"] { padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;}
+        
+        #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all;}
+        #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
+
+        /* --- 遊戲畫面 --- */
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+        }
+
+        .top-bar {
+            position: absolute;
+            top: -80px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .top-right-controls { display: flex; gap: 10px; }
+
+        #info-bar {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            font-weight: 900;
+            color: #555;
+            background: white;
+            padding: 5px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 15px;
+            width: 95%;
+            aspect-ratio: 2/1;
+        }
+
+        .card {
+            background-color: var(--box-bg);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 5px solid #eee;
+            transition: transform 0.1s;
+            overflow: hidden;
+        }
+
+        .card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+        
+        .card.contain-img img { object-fit: contain; width: 90%; height: 90%; }
+
+        .card.chinese-mode { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; color: #d63031; }
+        .card.math-mode { font-family: 'Times New Roman', serif; font-weight: bold; color: #0984e3; }
+
+        .card.active {
+            border-color: var(--primary-color) !important;
+            border-width: 6px !important;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.8);
+            z-index: 5;
+        }
+
+        .card.active:not(.color-card) { background-color: #ffeaa7; }
+
+        /* 暫停遮罩 */
+        #pause-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 50;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+        #pause-overlay h2 { color: white; font-size: 4rem; margin: 0 0 20px 0; letter-spacing: 5px; }
+
+        /* 結束畫面 */
+        #end-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        }
+
+        .hidden { display: none !important; }
+
+        #folder-input { display: none; }
+
+    </style>
+</head>
+<body>
+
+    <div id="home-screen">
+        <button id="settings-trigger" class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
+        
+        <h1>🎵 節奏遊戲</h1>
+        
+        <div class="theme-selector">
+            <label style="font-weight:bold; color:#555;">選擇主題</label>
+            <select id="theme-select" onchange="saveSettings()">
+                <option value="random">🎲 隨機主題 (每次換)</option>
+                <option value="mixed">🧪 大雜燴 (全部混合)</option>
+                
+                <optgroup label="API / 連網主題">
+                    <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
+                    <option value="robots">🤖 機器人 (RoboHash)</option>
+                    <option value="food">🍔 療癒美食 (精選)</option>
+                </optgroup>
+
+                <optgroup label="內建主題">
+                    <option value="math">➗ 數學符號</option>
+                    <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
+                    <option value="animals">🦁 動物 Emoji</option>
+                    <option value="numbers">🔢 數字</option>
+                    <option value="colors">🎨 顏色</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <div class="theme-selector" style="margin-top:10px;">
+            <label style="font-weight:bold; color:#555;">總回合數</label>
+            <select id="round-select" onchange="saveSettings()">
+                <option value="3">3 回合</option>
+                <option value="5">5 回合</option>
+                <option value="10">10 回合</option>
+                <option value="999">無限練習</option>
+            </select>
+        </div>
+
+        <button class="btn-primary" style="margin-top:20px; width:200px;" onclick="startGame()">START</button>
+    </div>
+
+    <div id="settings-modal" onclick="closeSettings(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ 遊戲設定</h2>
+                <button class="close-btn" onclick="closeSettingsBtn()">✕</button>
+            </div>
+
+            <div class="control-group" style="border: 2px dashed #2ed573; background: #eafff2;">
+                <label>📂 上傳自訂主題資料夾</label>
+                <input type="file" id="folder-input" webkitdirectory directory multiple>
+                <button class="btn-upload" onclick="document.getElementById('folder-input').click()">
+                    點擊選擇資料夾...
+                </button>
+                <div id="upload-status">可選取含圖片的資料夾 (名稱即主題)</div>
+            </div>
+
+            <div class="control-group">
+                <label>🎵 背景音樂 (自動記憶)</label>
+                <input type="file" id="music-file" accept="audio/*">
+                <div id="file-status">未選擇檔案</div>
+            </div>
+
+            <div class="control-group">
+                <label>🐢⏩ 音樂播放倍速: <span id="rate-display" style="color:#e056fd;">1.0</span>x</label>
+                <input type="range" id="rate-input" min="0.5" max="2.0" step="0.1" value="1.0" oninput="saveSettings()">
+                <small style="color:#888;">*自動同步格子速度 (0.5x ~ 2.0x)</small>
+            </div>
+
+            <div class="control-group">
+                <label>⏱️ 原曲速度 (BPM): <span id="bpm-display" style="color:var(--primary-color);">100</span></label>
+                <input type="range" id="bpm-input" min="60" max="180" value="100" oninput="saveSettings()">
+            </div>
+
+            <div class="control-group">
+                <label>⏯️ 音樂起點 (秒):</label>
+                <input type="number" id="offset-input" value="0" step="0.1" placeholder="正數=跳過, 負數=延遲" oninput="saveSettings()">
+            </div>
+
+            <div class="control-group">
+                <label>⏳ 音樂後等待 (秒):</label>
+                <input type="number" id="intro-seconds-input" value="0" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
+            </div>
+
+            <div class="control-group">
+                <label>🛌 回合間隔休息 (秒):</label>
+                <input type="range" id="interval-input" min="0" max="5" value="1.0" step="0.5" oninput="saveSettings()">
+                <div style="text-align:right; font-weight:bold; color:#555;"><span id="interval-display">1.0</span> 秒</div>
+            </div>
+            
+            <button class="btn-primary" style="width:100%; font-size:1rem;" onclick="closeSettingsBtn()">完成</button>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <div class="top-bar">
+            <button class="icon-btn" onclick="goHome()" title="回首頁">🏠</button>
+            <div class="top-right-controls">
+                <button class="icon-btn" id="pause-btn" onclick="togglePause()" title="暫停">⏸</button>
+                <button class="icon-btn" onclick="restartGame()" title="重置">🔄</button>
+            </div>
+        </div>
+        
+        <div id="info-bar">
+            Round <span id="current-round">1</span> / <span id="total-rounds">3</span>
+        </div>
+        
+        <div id="grid-container"></div>
+    </div>
+
+    <div id="pause-overlay">
+        <h2>PAUSED</h2>
+        <button class="btn-primary" style="width: 200px;" onclick="togglePause()">繼續</button>
+    </div>
+
+    <div id="end-screen">
+        <h1>🎉 挑戰完成！</h1>
+        <div style="display:flex; gap:20px;">
+            <button class="icon-btn" onclick="goHome()" title="回首頁">🏠</button>
+            <button class="btn-primary" onclick="restartGame()">再來一次</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 資料庫 ---
+        const commonData = {
+            animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
+            numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+            colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#000000', '#ffffff', '#ff00ff', '#00ffff', '#808080', '#ffa500'],
+            math: ['+','-','×','÷','=','≠','≈','>','<','π','√','∞','∫','∆','∑','Ω'],
+            // 美食精選
+            food: [
+                'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80',
+                'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80',
+                'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&q=80',
+                'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80',
+                'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&q=80',
+                'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=400&q=80',
+                'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&q=80',
+                'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80'
+            ]
+        };
+
+        const chineseGroups = {
+            'shi': ['是','事','世','市','式','試','士','示','視','誓','施','濕','獅','失','史','使','始','石','食','十','實'],
+            'ji': ['機','雞','基','積','績','跡','激','極','急','吉','即','集','擊','計','記','季','技','既','濟','繼'],
+            'yi': ['一','醫','衣','依','伊','移','疑','儀','宜','遺','乙','已','以','蟻','倚','意','義','議','益','藝'],
+            'fu': ['夫','膚','福','服','幅','府','父','付','負','婦','富','副','復','腹','覆','浮','扶','符'],
+            'yu': ['魚','漁','於','餘','娛','愚','雨','與','予','語','羽','玉','育','預','遇','欲','獄','域']
+        };
+
+        let customData = {}; 
+
+        // --- 遊戲狀態 ---
+        let gameState = {
+            round: 0,
+            maxRounds: 3,
+            theme: 'pokemon',
+            bpm: 100,
+            offset: 0,
+            interval: 1.0, 
+            introSeconds: 0,
+            playbackRate: 1.0, 
+            isPaused: false,
+            abortController: null,
+            selectedTheme: 'pokemon'
+        };
+
+        let audioCtx;
+        let bgmAudio = new Audio();
+        
+        // --- 2. 本地資料夾上傳邏輯 ---
+        document.getElementById('folder-input').addEventListener('change', function(e) {
+            const files = e.target.files;
+            let count = 0;
+            customData = {}; 
+
+            for (let file of files) {
+                if (!file.type.startsWith('image/')) continue;
+                const pathParts = file.webkitRelativePath.split('/');
+                let themeName = "自訂相簿";
+                if (pathParts.length > 1) {
+                    themeName = pathParts[pathParts.length - 2];
+                }
+                if (!customData[themeName]) customData[themeName] = [];
+                
+                const imgUrl = URL.createObjectURL(file);
+                customData[themeName].push(imgUrl);
+                count++;
+            }
+            updateThemeSelect();
+            document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片！`;
+        });
+
+        function updateThemeSelect() {
+            const select = document.getElementById('theme-select');
+            
+            select.innerHTML = `
+                <option value="random">🎲 隨機主題 (每次換)</option>
+                <option value="mixed">🧪 大雜燴 (全部混合)</option>
+            `;
+
+            if (Object.keys(customData).length > 0) {
+                const group = document.createElement('optgroup');
+                group.label = "📂 本地資料夾";
+                for (let theme in customData) {
+                    if (customData[theme].length > 0) {
+                        const opt = document.createElement('option');
+                        opt.value = "custom_" + theme;
+                        opt.innerText = `📁 ${theme} (${customData[theme].length}張)`;
+                        group.appendChild(opt);
+                    }
+                }
+                select.appendChild(group);
+            }
+
+            const apiGroup = document.createElement('optgroup');
+            apiGroup.label = "API / 連網主題";
+            apiGroup.innerHTML = `
+                <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
+                <option value="robots">🤖 機器人 (RoboHash)</option>
+                <option value="food">🍔 療癒美食 (精選)</option>
+            `;
+            select.appendChild(apiGroup);
+
+            const staticGroup = document.createElement('optgroup');
+            staticGroup.label = "內建主題";
+            staticGroup.innerHTML = `
+                <option value="math">➗ 數學符號</option>
+                <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
+                <option value="animals">🦁 動物 Emoji</option>
+                <option value="numbers">🔢 數字</option>
+                <option value="colors">🎨 顏色</option>
+            `;
+            select.appendChild(staticGroup);
+            
+            const lastTheme = localStorage.getItem('rg_theme');
+            if (lastTheme && select.querySelector(`option[value="${lastTheme}"]`)) {
+                select.value = lastTheme;
+            }
+        }
+
+        // --- 3. 資料庫與設定 (記憶) ---
+        const DB_NAME = "RhythmGameDB";
+        const DB_STORE = "files";
+
+        function saveSettings() {
+            localStorage.setItem('rg_theme', document.getElementById('theme-select').value);
+            localStorage.setItem('rg_rounds', document.getElementById('round-select').value);
+            localStorage.setItem('rg_bpm', document.getElementById('bpm-input').value);
+            localStorage.setItem('rg_offset', document.getElementById('offset-input').value);
+            localStorage.setItem('rg_intro', document.getElementById('intro-seconds-input').value);
+            localStorage.setItem('rg_interval', document.getElementById('interval-input').value);
+            localStorage.setItem('rg_rate', document.getElementById('rate-input').value);
+            
+            document.getElementById('bpm-display').innerText = document.getElementById('bpm-input').value;
+            document.getElementById('interval-display').innerText = document.getElementById('interval-input').value;
+            document.getElementById('rate-display').innerText = document.getElementById('rate-input').value;
+        }
+
+        function loadSettings() {
+            if(localStorage.getItem('rg_rounds')) document.getElementById('round-select').value = localStorage.getItem('rg_rounds');
+            if(localStorage.getItem('rg_bpm')) {
+                document.getElementById('bpm-input').value = localStorage.getItem('rg_bpm');
+                document.getElementById('bpm-display').innerText = localStorage.getItem('rg_bpm');
+            }
+            if(localStorage.getItem('rg_offset')) document.getElementById('offset-input').value = localStorage.getItem('rg_offset');
+            if(localStorage.getItem('rg_intro')) document.getElementById('intro-seconds-input').value = localStorage.getItem('rg_intro');
+            if(localStorage.getItem('rg_interval')) {
+                document.getElementById('interval-input').value = localStorage.getItem('rg_interval');
+                document.getElementById('interval-display').innerText = localStorage.getItem('rg_interval');
+            }
+            if(localStorage.getItem('rg_rate')) {
+                document.getElementById('rate-input').value = localStorage.getItem('rg_rate');
+                document.getElementById('rate-display').innerText = localStorage.getItem('rg_rate');
+            }
+        }
+
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e);
+            });
+        }
+
+        async function saveFileToDB(file) {
+            const db = await initDB();
+            const tx = db.transaction(DB_STORE, "readwrite");
+            tx.objectStore(DB_STORE).put(file, "bgm");
+        }
+
+        async function loadFileFromDB() {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(DB_STORE, "readonly");
+                const req = tx.objectStore(DB_STORE).get("bgm");
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        // --- 4. 介面與初始化 ---
+        function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
+        function closeSettingsBtn() { document.getElementById('settings-modal').style.display = 'none'; }
+        function closeSettings(e) { if(e.target.id === 'settings-modal') closeSettingsBtn(); }
+
+        document.getElementById('music-file').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                bgmAudio.src = URL.createObjectURL(file);
+                document.getElementById('file-status').innerText = `✅ 已選擇: ${file.name}`;
+                await saveFileToDB(file);
+            }
+        });
+
+        window.addEventListener('load', async () => {
+            loadSettings();
+            updateThemeSelect();
+            const file = await loadFileFromDB();
+            if (file) {
+                bgmAudio.src = URL.createObjectURL(file);
+                document.getElementById('file-status').innerText = `✅ 上次檔案: ${file.name}`;
+            }
+        });
+
+        // --- 5. 計時器核心 ---
+        class SmartTimer {
+            constructor(callback, delay) {
+                this.remaining = delay;
+                this.callback = callback;
+                this.start = Date.now();
+                this.timerId = setTimeout(this.finish.bind(this), delay);
+            }
+            pause() {
+                window.clearTimeout(this.timerId);
+                this.timerId = null;
+                this.remaining -= Date.now() - this.start;
+            }
+            resume() {
+                if (this.timerId) return;
+                this.start = Date.now();
+                this.timerId = setTimeout(this.finish.bind(this), this.remaining);
+            }
+            finish() { this.callback(); }
+        }
+
+        function wait(ms) {
+            if (ms <= 0) return Promise.resolve(); 
+            return new Promise((resolve, reject) => {
+                const timer = new SmartTimer(resolve, ms);
+                if (!window.currentTimers) window.currentTimers = [];
+                window.currentTimers.push(timer);
+                
+                if (gameState.abortController.signal.aborted) reject(new Error("Aborted"));
+                gameState.abortController.signal.addEventListener('abort', () => {
+                    window.clearTimeout(timer.timerId);
+                    reject(new Error("Aborted"));
+                });
+            });
+        }
+
+        // --- 6. 遊戲流程 ---
+
+        function startGame() {
+            gameState.maxRounds = parseInt(document.getElementById('round-select').value);
+            gameState.selectedTheme = document.getElementById('theme-select').value;
+            gameState.bpm = parseInt(document.getElementById('bpm-input').value);
+            gameState.offset = parseFloat(document.getElementById('offset-input').value);
+            gameState.interval = parseFloat(document.getElementById('interval-input').value);
+            gameState.introSeconds = parseFloat(document.getElementById('intro-seconds-input').value) || 0;
+            gameState.playbackRate = parseFloat(document.getElementById('rate-input').value) || 1.0;
+            
+            gameState.round = 0;
+            gameState.abortController = new AbortController();
+            window.currentTimers = [];
+
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            document.getElementById('home-screen').classList.add('hidden');
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'flex';
+            document.getElementById('total-rounds').innerText = gameState.maxRounds;
+
+            runGameLoop();
+        }
+
+        function getItem(theme) {
+            if (theme.startsWith('custom_')) {
+                const realThemeName = theme.replace('custom_', '');
+                if (customData[realThemeName] && customData[realThemeName].length > 0) {
+                    return customData[realThemeName][Math.floor(Math.random() * customData[realThemeName].length)];
+                }
+                return "❓";
+            }
+            if (theme === 'pokemon') {
+                const id = Math.floor(Math.random() * 151) + 1;
+                return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+            }
+            if (theme === 'robots') {
+                const txt = Math.random().toString(36).substring(7);
+                return `https://robohash.org/${txt}?set=set1`;
+            }
+            if (theme === 'chinese_phonetic') {
+                const keys = Object.keys(chineseGroups);
+                const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                return chineseGroups[randomKey][Math.floor(Math.random() * chineseGroups[randomKey].length)];
+            }
+            if (commonData[theme]) {
+                return commonData[theme][Math.floor(Math.random() * commonData[theme].length)];
+            }
+            return "🐶"; 
+        }
+
+        function getAllAvailableThemes() {
+            let themes = ['pokemon', 'robots', 'food', 'math', 'chinese_phonetic', 'animals', 'numbers', 'colors'];
+            for (let t in customData) {
+                themes.push('custom_' + t);
+            }
+            return themes;
+        }
+
+        async function runGameLoop() {
+            try {
+                // 套用播放倍速
+                bgmAudio.playbackRate = gameState.playbackRate;
+
+                while (gameState.round < gameState.maxRounds) {
+                    gameState.round++;
+                    document.getElementById('current-round').innerText = gameState.round;
+                    
+                    let currentRoundTheme = gameState.selectedTheme;
+                    const allThemes = getAllAvailableThemes();
+
+                    if (gameState.selectedTheme === 'random') {
+                        currentRoundTheme = allThemes[Math.floor(Math.random() * allThemes.length)];
+                    }
+
+                    // A. 音樂播放
+                    if (bgmAudio.src) {
+                        if (gameState.offset < 0) {
+                            bgmAudio.currentTime = 0;
+                            await wait(Math.abs(gameState.offset) * 1000);
+                            bgmAudio.play().catch(e => console.log("Audio play error", e));
+                        } else {
+                            bgmAudio.currentTime = gameState.offset;
+                            bgmAudio.play().catch(e => console.log("Audio play error", e));
+                        }
+                    }
+
+                    // B. 產生題目
+                    const grid = document.getElementById('grid-container');
+                    grid.innerHTML = '';
+                    let items = [];
+
+                    if (gameState.selectedTheme === 'mixed') {
+                        for(let i=0; i<8; i++) {
+                            const randTheme = allThemes[Math.floor(Math.random() * allThemes.length)];
+                            items.push({ val: getItem(randTheme), theme: randTheme });
+                        }
+                    } else {
+                        if (currentRoundTheme === 'chinese_phonetic') {
+                            const keys = Object.keys(chineseGroups);
+                            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                            const slice = chineseGroups[randomKey].sort(() => 0.5 - Math.random()).slice(0, 8);
+                            items = slice.map(v => ({ val: v, theme: 'chinese_phonetic' }));
+                        } else if (currentRoundTheme.startsWith('custom_')) {
+                            const realName = currentRoundTheme.replace('custom_', '');
+                            const pool = customData[realName];
+                            for(let i=0; i<8; i++) {
+                                items.push({ val: pool[Math.floor(Math.random() * pool.length)], theme: currentRoundTheme });
+                            }
+                        } else if (currentRoundTheme === 'pokemon' || currentRoundTheme === 'robots') {
+                             for(let i=0; i<8; i++) {
+                                items.push({ val: getItem(currentRoundTheme), theme: currentRoundTheme });
+                            }
+                        } else {
+                            const pool = commonData[currentRoundTheme] || commonData['animals'];
+                            const slice = [...pool].sort(() => 0.5 - Math.random()).slice(0, 8);
+                            items = slice.map(v => ({ val: v, theme: currentRoundTheme }));
+                        }
+                    }
+                    
+                    items.forEach(obj => {
+                        const item = obj.val;
+                        const th = obj.theme;
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        
+                        const isUrl = typeof item === 'string' && (item.startsWith('http') || item.startsWith('blob:'));
+
+                        if (isUrl) {
+                            card.classList.add('contain-img');
+                            card.innerHTML = `<img src="${item}">`;
+                        } else if (th === 'colors') {
+                            card.style.backgroundColor = item;
+                            card.classList.add('color-card');
+                            if(item === '#ffffff') card.style.borderColor = '#ddd';
+                        } else {
+                            card.innerText = item;
+                            if (th === 'numbers') card.classList.add('number-mode');
+                            if (th === 'math') card.classList.add('math-mode');
+                            if (th === 'chinese_phonetic') card.classList.add('chinese-mode');
+                        }
+                        grid.appendChild(card);
+                    });
+
+                    // C. 等待秒數
+                    if (gameState.introSeconds > 0) {
+                        await wait(gameState.introSeconds * 1000);
+                    }
+
+                    // D. 跑格子
+                    const msPerBeat = (60000 / gameState.bpm) / gameState.playbackRate;
+                    const cards = document.querySelectorAll('.card');
+                    for (let i = 0; i < 8; i++) {
+                        if (i>0) cards[i-1].classList.remove('active');
+                        cards[i].classList.add('active');
+                        await wait(msPerBeat);
+                    }
+                    if(cards.length > 0) cards[7].classList.remove('active');
+
+                    // E. 回合結束
+                    if (bgmAudio.src) bgmAudio.pause();
+
+                    if (gameState.round < gameState.maxRounds) {
+                        await wait(gameState.interval * 1000); 
+                    }
+                }
+                
+                showEndScreen();
+
+            } catch (error) {
+                if (error.message !== "Aborted") console.error(error);
+            }
+        }
+
+        function showEndScreen() {
+            bgmAudio.pause();
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'flex';
+            document.getElementById('home-screen').classList.add('hidden');
+        }
+
+        // --- 7. 控制功能 ---
+        function togglePause() {
+            gameState.isPaused = !gameState.isPaused;
+            const overlay = document.getElementById('pause-overlay');
+            const btn = document.getElementById('pause-btn');
+            
+            if (gameState.isPaused) {
+                overlay.style.display = 'flex';
+                btn.innerText = '▶️';
+                bgmAudio.pause();
+                window.currentTimers.forEach(t => t.pause());
+            } else {
+                overlay.style.display = 'none';
+                btn.innerText = '⏸';
+                bgmAudio.play();
+                window.currentTimers.forEach(t => t.resume());
+            }
+        }
+
+        function resetLogic() {
+            if (gameState.abortController) gameState.abortController.abort();
+            bgmAudio.pause();
+            gameState.isPaused = false;
+            document.getElementById('pause-overlay').style.display = 'none';
+            document.getElementById('pause-btn').innerText = '⏸';
+        }
+
+        function restartGame() {
+            resetLogic();
+            setTimeout(startGame, 100);
+        }
+
+        function goHome() {
+            resetLogic();
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('home-screen').classList.remove('hidden');
+            document.getElementById('home-screen').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
