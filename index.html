@@ -8,6 +8,7 @@
         :root {
             --primary-color: #ff4757;
             --secondary-color: #2ed573;
+            --link-color: #54a0ff;
             --bg-color: #f1f2f6;
             --box-bg: #ffffff;
             --modal-bg: rgba(0, 0, 0, 0.6);
@@ -90,7 +91,8 @@
             padding: 12px; border-radius: 10px;
         }
         .control-group label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-        input[type="range"], input[type="number"] { width: 100%; padding: 5px; }
+        input[type="range"], input[type="number"], input[type="text"] { width: 100%; padding: 5px; box-sizing: border-box; }
+        input[type="text"] { border: 1px solid #ccc; border-radius: 5px; padding: 8px; }
         
         #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all; }
         #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
@@ -204,9 +206,19 @@
             </div>
 
             <div class="control-group">
-                <label>🎵 背景音樂 (支援所有音訊)</label>
-                <input type="file" id="music-file">
-                <div id="file-status">未選擇檔案</div>
+                <label>🎵 背景音樂 (二選一)</label>
+                
+                <div style="margin-bottom: 10px;">
+                    <label style="font-size:0.85rem; color:#666;">1. 上傳 MP3 檔案:</label>
+                    <input type="file" id="music-file">
+                </div>
+
+                <div>
+                    <label style="font-size:0.85rem; color:#666;">2. 或貼上 Google Drive 共用連結:</label>
+                    <input type="text" id="drive-input" placeholder="https://drive.google.com/file/d/..." oninput="handleDriveLink(this.value)">
+                </div>
+
+                <div id="file-status" style="margin-top:8px;">未選擇檔案</div>
             </div>
 
             <div class="control-group">
@@ -226,7 +238,7 @@
 
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
-                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" oninput="saveSettings()">
+                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
             </div>
 
             <div class="control-group">
@@ -264,6 +276,7 @@
     </div>
 
     <script>
+        // --- 1. 資料庫 ---
         const commonData = {
             animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
             numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
@@ -298,6 +311,8 @@
 
         let audioCtx;
         let bgmAudio = new Audio();
+        // 允許跨域 (針對 Drive)
+        bgmAudio.crossOrigin = "anonymous"; 
         
         const DB_NAME = "RhythmGameDB";
         const DB_STORE = "files";
@@ -319,28 +334,45 @@
             document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
 
-        // 音樂選取 - 終極相容版邏輯
+        // 音樂選取
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             
-            // 1. 立刻建立連結，保證 UI 有反應
+            // 清空 Drive 輸入框避免混淆
+            document.getElementById('drive-input').value = "";
+
             const url = URL.createObjectURL(file);
             bgmAudio.src = url;
             bgmAudio.load();
-            document.getElementById('file-status').innerText = `✅ 準備就緒: ${file.name}`;
-            
-            // 2. 允許重複選取
+            document.getElementById('file-status').innerText = `✅ 本地檔案: ${file.name}`;
             this.value = '';
-
-            // 3. 嘗試在背景存檔 (不阻擋流程)
-            saveFileToDB(file).then(() => {
-                console.log("DB Saved");
-            }).catch(err => {
-                console.warn("DB Save Failed (Incognito?):", err);
-                document.getElementById('file-status').innerText += " (僅本次有效)";
-            });
+            
+            saveFileToDB(file).catch(e => console.log("DB Skip"));
         });
+
+        // Google Drive 處理邏輯
+        function handleDriveLink(url) {
+            if (!url) return;
+            
+            // 嘗試提取 ID
+            let id = "";
+            const parts = url.match(/[-\w]{25,}/); // 簡易 ID 匹配
+            if (parts) id = parts[0];
+
+            if (id) {
+                // 轉換為直連網址
+                const directUrl = `https://drive.google.com/uc?export=download&id=${id}`;
+                bgmAudio.src = directUrl;
+                bgmAudio.load();
+                
+                document.getElementById('file-status').innerText = `☁️ Google Drive ID: ${id.substring(0,5)}...`;
+                document.getElementById('music-file').value = ""; // 清空本地檔案選取
+                
+                // 記憶 Drive URL
+                localStorage.setItem('rg_drive_url', url);
+            }
+        }
 
         function initDB() {
             return new Promise((resolve, reject) => {
@@ -410,6 +442,11 @@
             if(s.getItem('rg_rate')) {
                 document.getElementById('rate-input').value = s.getItem('rg_rate');
                 document.getElementById('rate-display').innerText = s.getItem('rg_rate');
+            }
+            // 恢復 Drive 連結
+            if(s.getItem('rg_drive_url')) {
+                document.getElementById('drive-input').value = s.getItem('rg_drive_url');
+                handleDriveLink(s.getItem('rg_drive_url'));
             }
         }
 
@@ -690,5 +727,3 @@
     </script>
 </body>
 </html>
-
-
