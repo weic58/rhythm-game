@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>節奏遊戲</title>
     <style>
         :root {
@@ -24,10 +24,9 @@
             margin: 0;
             overflow: hidden;
             user-select: none;
-            -webkit-user-select: none; /* Safari 專用 */
         }
 
-        /* 通用按鈕 */
+        /* 通用按鈕樣式 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -47,11 +46,6 @@
             background-color: var(--secondary-color); color: white; border: none;
             padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
             cursor: pointer; width: 100%; margin-top: 5px;
-        }
-
-        .btn-test {
-            background-color: #54a0ff; color: white; border: none; padding: 5px 10px;
-            border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-left: 5px;
         }
 
         /* 主畫面 */
@@ -96,8 +90,7 @@
             padding: 12px; border-radius: 10px;
         }
         .control-group label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-        input[type="range"], input[type="number"], input[type="text"] { width: 100%; padding: 5px; box-sizing: border-box; }
-        input[type="text"] { border: 1px solid #ccc; border-radius: 5px; padding: 8px; }
+        input[type="range"], input[type="number"] { width: 100%; padding: 5px; }
         
         #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all; }
         #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
@@ -211,22 +204,9 @@
             </div>
 
             <div class="control-group">
-                <label>🎵 背景音樂</label>
-                
-                <div style="margin-bottom: 10px;">
-                    <label style="font-size:0.85rem; color:#666;">1. 上傳 MP3 檔案:</label>
-                    <input type="file" id="music-file">
-                </div>
-
-                <div>
-                    <label style="font-size:0.85rem; color:#666;">2. 或貼上 Google Drive 連結:</label>
-                    <input type="text" id="drive-input" placeholder="https://drive.google.com/..." oninput="handleDriveLink(this.value)">
-                </div>
-
-                <div style="margin-top:10px; display:flex; align-items:center; gap:5px;">
-                    <span id="file-status">未選擇檔案</span>
-                    <button class="btn-test" onclick="testAudio()">🔊 試聽</button>
-                </div>
+                <label>🎵 背景音樂 (支援所有音訊)</label>
+                <input type="file" id="music-file">
+                <div id="file-status">未選擇檔案</div>
             </div>
 
             <div class="control-group">
@@ -246,7 +226,7 @@
 
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
-                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
+                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" oninput="saveSettings()">
             </div>
 
             <div class="control-group">
@@ -318,7 +298,6 @@
 
         let audioCtx;
         let bgmAudio = new Audio();
-        bgmAudio.preload = "auto"; // 強制預載
         
         const DB_NAME = "RhythmGameDB";
         const DB_STORE = "files";
@@ -340,53 +319,28 @@
             document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
 
-        // 音樂選取
+        // 音樂選取 - 終極相容版邏輯
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            document.getElementById('drive-input').value = "";
             
-            // 建立 Blob URL
+            // 1. 立刻建立連結，保證 UI 有反應
             const url = URL.createObjectURL(file);
             bgmAudio.src = url;
             bgmAudio.load();
+            document.getElementById('file-status').innerText = `✅ 準備就緒: ${file.name}`;
             
-            document.getElementById('file-status').innerText = `✅ 本地檔案: ${file.name}`;
-            this.value = ''; // 允許重複選取
-            
-            saveFileToDB(file).catch(e => console.log("DB Skip"));
+            // 2. 允許重複選取
+            this.value = '';
+
+            // 3. 嘗試在背景存檔 (不阻擋流程)
+            saveFileToDB(file).then(() => {
+                console.log("DB Saved");
+            }).catch(err => {
+                console.warn("DB Save Failed (Incognito?):", err);
+                document.getElementById('file-status').innerText += " (僅本次有效)";
+            });
         });
-
-        function handleDriveLink(url) {
-            if (!url) return;
-            let id = "";
-            const parts = url.match(/[-\w]{25,}/);
-            if (parts) id = parts[0];
-            if (id) {
-                const directUrl = `https://drive.google.com/uc?export=download&id=${id}`;
-                bgmAudio.src = directUrl;
-                bgmAudio.load();
-                document.getElementById('file-status').innerText = `☁️ Google Drive: 載入中...`;
-                document.getElementById('music-file').value = "";
-                localStorage.setItem('rg_drive_url', url);
-            }
-        }
-
-        // 試聽功能
-        function testAudio() {
-            if (!bgmAudio.src) {
-                alert("請先選擇檔案！");
-                return;
-            }
-            bgmAudio.volume = 1.0;
-            bgmAudio.playbackRate = parseFloat(document.getElementById('rate-input').value);
-            bgmAudio.play()
-                .then(() => {
-                    document.getElementById('file-status').innerText += " (播放中)";
-                    setTimeout(() => { bgmAudio.pause(); bgmAudio.currentTime = 0; }, 3000); // 試聽3秒
-                })
-                .catch(e => alert("播放失敗，請確認檔案格式或連結權限。\n錯誤: " + e.message));
-        }
 
         function initDB() {
             return new Promise((resolve, reject) => {
@@ -456,10 +410,6 @@
             if(s.getItem('rg_rate')) {
                 document.getElementById('rate-input').value = s.getItem('rg_rate');
                 document.getElementById('rate-display').innerText = s.getItem('rg_rate');
-            }
-            if(s.getItem('rg_drive_url')) {
-                document.getElementById('drive-input').value = s.getItem('rg_drive_url');
-                handleDriveLink(s.getItem('rg_drive_url'));
             }
         }
 
@@ -559,7 +509,9 @@
             gameState.abortController = new AbortController();
             window.currentTimers = [];
 
-            // 這裡非常重要：強制解鎖
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+            
             if (bgmAudio.src) {
                 try {
                     bgmAudio.volume = 0; 
@@ -567,7 +519,7 @@
                     bgmAudio.pause();
                     bgmAudio.currentTime = 0;
                     bgmAudio.volume = 1; 
-                } catch (e) { console.log("Unlock failed, trying again...", e); }
+                } catch (e) { console.log("Unlock failed", e); }
             }
 
             document.getElementById('home-screen').classList.add('hidden');
