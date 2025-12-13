@@ -26,7 +26,7 @@
             user-select: none;
         }
 
-        /* 按鈕樣式 */
+        /* 通用按鈕樣式 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -46,11 +46,6 @@
             background-color: var(--secondary-color); color: white; border: none;
             padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
             cursor: pointer; width: 100%; margin-top: 5px;
-        }
-
-        .btn-danger {
-            background-color: #ff6b6b; color: white; border: none; padding: 5px 10px;
-            border-radius: 5px; font-size: 0.8rem; cursor: pointer; margin-top: 5px;
         }
 
         /* 主畫面 */
@@ -135,7 +130,6 @@
         }
         .card.active:not(.color-card) { background-color: #ffeaa7; }
 
-        /* 遮罩 */
         #pause-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); z-index: 50; display: none;
@@ -163,12 +157,12 @@
         <div class="theme-selector">
             <label style="font-weight:bold; color:#555;">選擇主題</label>
             <select id="theme-select" onchange="saveSettings()">
-                <option value="random">🎲 隨機主題</option>
-                <option value="mixed">🧪 大雜燴 (混合)</option>
+                <option value="random">🎲 隨機主題 (每次換)</option>
+                <option value="mixed">🧪 大雜燴 (全部混合)</option>
                 <optgroup label="API / 連網主題">
                     <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
                     <option value="robots">🤖 機器人 (RoboHash)</option>
-                    <option value="food">🍔 療癒美食</option>
+                    <option value="food">🍔 療癒美食 (精選)</option>
                 </optgroup>
                 <optgroup label="內建主題">
                     <option value="math">➗ 數學符號</option>
@@ -210,10 +204,9 @@
             </div>
 
             <div class="control-group">
-                <label>🎵 背景音樂 (支援 .mp3, .wav)</label>
-                <input type="file" id="music-file" accept=".mp3,audio/*">
+                <label>🎵 背景音樂 (支援所有音訊)</label>
+                <input type="file" id="music-file">
                 <div id="file-status">未選擇檔案</div>
-                <button class="btn-danger" onclick="clearMusicDB()">🗑️ 清除音樂資料 (卡住請按)</button>
             </div>
 
             <div class="control-group">
@@ -271,7 +264,6 @@
     </div>
 
     <script>
-        // --- 1. 資料庫 ---
         const commonData = {
             animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
             numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
@@ -307,11 +299,10 @@
         let audioCtx;
         let bgmAudio = new Audio();
         
-        // --- 2. 檔案處理 (強化版) ---
         const DB_NAME = "RhythmGameDB";
         const DB_STORE = "files";
 
-        // 資料夾上傳
+        // 資料夾
         document.getElementById('folder-input').addEventListener('change', function(e) {
             const files = e.target.files;
             let count = 0;
@@ -328,45 +319,29 @@
             document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
 
-        // MP3 音樂上傳
-        document.getElementById('music-file').addEventListener('change', async function(e) {
+        // 音樂選取 - 終極相容版邏輯
+        document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             
-            // 立即顯示選擇的檔名
-            document.getElementById('file-status').innerText = `✅ 準備中: ${file.name}`;
+            // 1. 立刻建立連結，保證 UI 有反應
+            const url = URL.createObjectURL(file);
+            bgmAudio.src = url;
+            bgmAudio.load();
+            document.getElementById('file-status').innerText = `✅ 準備就緒: ${file.name}`;
             
-            try {
-                // 嘗試存入 DB
-                await saveFileToDB(file);
-                // 建立播放連結
-                const url = URL.createObjectURL(file);
-                bgmAudio.src = url;
-                bgmAudio.load(); // 關鍵：強制載入
-                document.getElementById('file-status').innerText = `✅ 已就緒: ${file.name}`;
-            } catch (err) {
-                console.error("DB Error:", err);
-                // 如果 DB 失敗，至少讓現在能玩
-                bgmAudio.src = URL.createObjectURL(file);
-                document.getElementById('file-status').innerText = `⚠️ 僅暫時讀取 (無法記憶): ${file.name}`;
-            }
+            // 2. 允許重複選取
+            this.value = '';
+
+            // 3. 嘗試在背景存檔 (不阻擋流程)
+            saveFileToDB(file).then(() => {
+                console.log("DB Saved");
+            }).catch(err => {
+                console.warn("DB Save Failed (Incognito?):", err);
+                document.getElementById('file-status').innerText += " (僅本次有效)";
+            });
         });
 
-        // 清除 DB 功能
-        async function clearMusicDB() {
-            try {
-                const req = indexedDB.deleteDatabase(DB_NAME);
-                req.onsuccess = () => {
-                    alert("已清除音樂快取，請重新整理網頁！");
-                    location.reload();
-                };
-                req.onerror = () => alert("清除失敗，請手動清除瀏覽器資料");
-            } catch(e) {
-                alert("清除錯誤");
-            }
-        }
-
-        // DB 相關函式
         function initDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open(DB_NAME, 1);
@@ -398,13 +373,9 @@
                     req.onsuccess = () => resolve(req.result);
                     req.onerror = () => resolve(null);
                 });
-            } catch(e) {
-                console.log("DB Load Error", e);
-                return null;
-            }
+            } catch(e) { return null; }
         }
 
-        // --- 3. UI 與初始化 ---
         function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
         function closeSettingsBtn() { document.getElementById('settings-modal').style.display = 'none'; }
         function closeSettings(e) { if(e.target.id === 'settings-modal') closeSettingsBtn(); }
@@ -484,7 +455,6 @@
             }
         }
 
-        // 初始化
         window.addEventListener('load', async () => {
             loadSettings();
             updateThemeSelect();
@@ -496,7 +466,6 @@
             }
         });
 
-        // --- 4. 遊戲核心 ---
         class SmartTimer {
             constructor(callback, delay) {
                 this.remaining = delay; this.callback = callback;
@@ -540,7 +509,6 @@
             gameState.abortController = new AbortController();
             window.currentTimers = [];
 
-            // Safari Audio Unlock
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') await audioCtx.resume();
             
@@ -604,7 +572,6 @@
                     const allT = getAllThemes();
                     if (gameState.selectedTheme === 'random') curTheme = allT[Math.floor(Math.random() * allT.length)];
 
-                    // 音樂播放
                     if (bgmAudio.src) {
                         if (gameState.offset < 0) {
                             bgmAudio.currentTime = 0;
@@ -616,7 +583,6 @@
                         }
                     }
 
-                    // 產生題目
                     const grid = document.getElementById('grid-container');
                     grid.innerHTML = '';
                     let items = [];
@@ -627,7 +593,6 @@
                             items.push({ val: getItem(rt), theme: rt });
                         }
                     } else {
-                        // 單一主題
                         if (curTheme === 'chinese_phonetic') {
                             const keys = Object.keys(chineseGroups);
                             const k = keys[Math.floor(Math.random() * keys.length)];
@@ -667,10 +632,8 @@
                         grid.appendChild(card);
                     });
 
-                    // Intro Wait
                     if (gameState.introSeconds > 0) await wait(gameState.introSeconds * 1000);
 
-                    // Run Grid
                     const msPerBeat = (60000 / gameState.bpm) / gameState.playbackRate;
                     const cards = document.querySelectorAll('.card');
                     for (let i = 0; i < 8; i++) {
