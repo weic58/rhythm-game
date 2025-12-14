@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>節奏遊戲 (錄音+搜尋版)</title>
+    <title>節奏遊戲 Plus</title>
     <style>
         :root {
             --primary-color: #ff4757;
@@ -11,7 +11,7 @@
             --accent-color: #54a0ff;
             --bg-color: #f1f2f6;
             --box-bg: #ffffff;
-            --modal-bg: rgba(0, 0, 0, 0.6);
+            --modal-bg: rgba(0, 0, 0, 0.7);
         }
 
         body {
@@ -28,7 +28,7 @@
             -webkit-user-select: none;
         }
 
-        /* 通用按鈕 */
+        /* 按鈕樣式 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -47,7 +47,7 @@
         .btn-action {
             background-color: var(--accent-color); color: white; border: none;
             padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
-            cursor: pointer; width: 100%; margin-top: 5px;
+            cursor: pointer; width: auto; flex-shrink: 0;
         }
 
         .btn-upload {
@@ -87,7 +87,7 @@
         }
         .modal-content {
             background: white; padding: 30px; border-radius: 20px;
-            width: 90%; max-width: 420px; max-height: 85vh; overflow-y: auto;
+            width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto;
             position: relative; animation: popUp 0.3s ease;
         }
         @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -110,6 +110,24 @@
         #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
         #search-status { font-size: 0.85rem; color: var(--accent-color); margin-top: 5px; font-weight: bold; }
 
+        /* 預覽區域 */
+        #preview-area {
+            display: none; margin-top: 10px;
+            background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px;
+        }
+        #preview-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px;
+        }
+        .preview-item { position: relative; }
+        .preview-img {
+            width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; background: #eee;
+        }
+        .preview-label {
+            position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6);
+            color: white; font-size: 0.6rem; text-align: center; overflow: hidden; white-space: nowrap;
+        }
+        .preview-controls { display: flex; gap: 10px; justify-content: flex-end; }
+
         /* 遊戲畫面 */
         #game-screen {
             display: none; flex-direction: column; align-items: center;
@@ -131,14 +149,35 @@
         }
         .card {
             background-color: var(--box-bg); border-radius: 12px; display: flex;
-            align-items: center; justify-content: center; font-size: 4rem;
+            align-items: center; justify-content: center; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 5px solid #eee;
-            transition: transform 0.1s; overflow: hidden;
+            transition: transform 0.1s; overflow: hidden; position: relative;
+            flex-direction: column; 
         }
+        
+        .card-content {
+            flex: 1; width: 100%; height: 100%; display: flex;
+            align-items: center; justify-content: center; overflow: hidden;
+            font-size: 4rem; 
+        }
+        
         .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
         .card.contain-img img { object-fit: contain; width: 90%; height: 90%; }
-        .card.chinese-mode { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; color: #d63031; }
-        .card.math-mode { font-family: 'Times New Roman', serif; font-weight: bold; color: #0984e3; }
+        
+        .card.chinese-mode .card-content { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; color: #d63031; }
+        .card.math-mode .card-content { font-family: 'Times New Roman', serif; font-weight: bold; color: #0984e3; }
+
+        /* 答案標籤 */
+        .answer-label {
+            display: none; 
+            width: 100%; background: rgba(0,0,0,0.7); color: white;
+            font-size: 1.2rem; padding: 5px 0; text-align: center;
+            position: absolute; bottom: 0; left: 0; font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+        }
+        
+        .card.show-hint .answer-label { display: block; }
+
         .card.active {
             border-color: var(--primary-color) !important; transform: scale(1.05);
             box-shadow: 0 0 30px rgba(255, 71, 87, 0.8); z-index: 5;
@@ -157,14 +196,35 @@
         #end-screen {
             display: none; flex-direction: column; align-items: center; gap: 20px;
             background: white; padding: 30px; border-radius: 20px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 85%; max-width: 400px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 90%; max-width: 600px;
+            max-height: 90vh; overflow-y: auto;
         }
         
         #audio-player-container {
-            width: 100%; background: #f1f2f6; padding: 15px; border-radius: 10px;
-            text-align: center; display: none; /* 預設隱藏 */
+            width: 100%; background: #f1f2f6; padding: 10px; border-radius: 10px;
+            text-align: center; display: none; margin-bottom: 10px;
         }
-        audio { width: 100%; margin-top: 10px; }
+        audio { width: 100%; margin-top: 5px; }
+
+        /* 遊戲歷史清單 */
+        #game-history {
+            width: 100%; text-align: left; background: #fafafa; padding: 10px;
+            border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px;
+        }
+        .history-round { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px dashed #ddd; }
+        .history-title { font-weight:bold; color: var(--primary-color); margin-bottom: 5px; }
+        .history-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
+        }
+        .history-item {
+            display: flex; flex-direction: column; align-items: center; 
+            border: 1px solid #eee; border-radius: 5px; padding: 5px; background: white;
+        }
+        .history-thumb { 
+            width: 100%; aspect-ratio: 1; object-fit: contain; 
+            display:flex; align-items:center; justify-content:center; font-size:1.5rem;
+        }
+        .history-name { font-size: 0.8rem; color: #555; text-align: center; margin-top: 2px; font-weight: bold; overflow-wrap: break-word; word-break: break-all; width: 100%;}
 
         .hidden { display: none !important; }
         #folder-input { display: none; }
@@ -186,17 +246,19 @@
                 <optgroup label="🔍 自訂搜尋">
                     </optgroup>
 
-                <optgroup label="API / 連網主題">
-                    <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
-                    <option value="robots">🤖 機器人 (RoboHash)</option>
-                    <option value="food">🍔 療癒美食 (精選)</option>
-                </optgroup>
-                <optgroup label="內建主題">
+                <optgroup label="內建主題 (附答案)">
+                    <option value="flags">🏳️‍🌈 國旗挑戰 (New!)</option>
                     <option value="math">➗ 數學符號</option>
                     <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
                     <option value="animals">🦁 動物 Emoji</option>
                     <option value="numbers">🔢 數字</option>
                     <option value="colors">🎨 顏色</option>
+                </optgroup>
+
+                <optgroup label="API / 連網主題">
+                    <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
+                    <option value="robots">🤖 機器人 (RoboHash)</option>
+                    <option value="food">🍔 療癒美食 (精選)</option>
                 </optgroup>
             </select>
         </div>
@@ -222,12 +284,20 @@
             </div>
 
             <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
-                <label style="color:#54a0ff;">🔍 搜尋並建立主題</label>
+                <label style="color:#54a0ff;">🔍 關鍵字搜尋 (支援多詞)</label>
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="search-input" placeholder="輸入關鍵字 (如: Batman)">
-                    <button class="btn-action" style="width:auto; margin:0;" onclick="createSearchTheme()">搜尋</button>
+                    <input type="text" id="search-input" placeholder="輸入: Cat,Dog,Bird (逗號分隔)">
+                    <button class="btn-action" onclick="previewSearchImages()">搜尋</button>
                 </div>
-                <div id="search-status">輸入英文關鍵字效果較好</div>
+                
+                <div id="preview-area">
+                    <div style="font-size:0.8rem; margin-bottom:5px; color:#555;">預覽 (答案即為關鍵字):</div>
+                    <div id="preview-grid"></div>
+                    <div class="preview-controls">
+                        <button class="btn-test" onclick="previewSearchImages()">🔄 重骰</button>
+                        <button class="btn-action" style="background:#2ed573;" onclick="confirmSearchTheme()">✅ 確認使用</button>
+                    </div>
+                </div>
             </div>
 
             <div class="control-group" style="border: 2px dashed #2ed573; background: #eafff2;">
@@ -236,18 +306,14 @@
                 <button class="btn-upload" onclick="document.getElementById('folder-input').click()">
                     點擊選擇資料夾...
                 </button>
-                <div id="upload-status">可選取含圖片的資料夾 (名稱即主題)</div>
+                <div id="upload-status">檔名即為答案 (例: 皮卡丘.jpg)</div>
             </div>
 
             <div class="control-group">
                 <label>🎵 背景音樂</label>
                 <div style="margin-bottom: 10px;">
-                    <label style="font-size:0.85rem; color:#666;">1. 上傳檔案 (MP3/WAV):</label>
+                    <label style="font-size:0.85rem; color:#666;">上傳檔案 (MP3/WAV):</label>
                     <input type="file" id="music-file">
-                </div>
-                <div>
-                    <label style="font-size:0.85rem; color:#666;">2. 或 Google Drive 連結:</label>
-                    <input type="text" id="drive-input" placeholder="https://drive.google.com/..." oninput="handleDriveLink(this.value)">
                 </div>
                 <div style="margin-top:10px; display:flex; align-items:center; gap:5px;">
                     <span id="file-status">未選擇檔案</span>
@@ -256,12 +322,21 @@
             </div>
 
             <div class="control-group">
+                <label>💡 答案提示 (漸進式記憶):</label>
+                <select id="hint-mode" onchange="saveSettings()">
+                    <option value="first">僅第一回合 (記憶模式)</option>
+                    <option value="always">每回合都顯示 (練習)</option>
+                    <option value="none">隱藏 (考試)</option>
+                </select>
+                <small style="color:#888;">*選擇國旗等主題時，後面回合會考你第一回合的內容</small>
+            </div>
+
+            <div class="control-group">
                 <label>🎙️ 遊戲錄音 (結束後回放):</label>
                 <select id="record-toggle" onchange="saveSettings()">
                     <option value="off">關閉</option>
                     <option value="on">開啟 (需麥克風權限)</option>
                 </select>
-                <small style="color:#888;">*戴耳機效果最佳，避免錄到背景音樂</small>
             </div>
 
             <div class="control-group">
@@ -317,31 +392,49 @@
         <div id="audio-player-container">
             <h3>🎙️ 你的表現回放</h3>
             <audio id="record-player" controls></audio>
-            <div style="font-size:0.8rem; color:#666; margin-top:5px;">(聽聽看有沒有對在拍子上！)</div>
         </div>
 
-        <div style="display:flex; gap:20px;">
+        <div style="width:100%;">
+            <h3 style="margin-bottom:10px;">📜 本局題目回顧 (所有答案)</h3>
+            <div id="game-history"></div>
+        </div>
+
+        <div style="display:flex; gap:20px; margin-top:10px;">
             <button class="icon-btn" onclick="goHome()">🏠</button>
             <button class="btn-primary" onclick="restartGame()">再來一次</button>
         </div>
     </div>
 
     <script>
-        // 資料庫
+        // --- 1. 資料庫 ---
+        // 國旗 (FlagCDN)
+        const flagsData = [
+            { c: 'tw', n: '台灣' }, { c: 'jp', n: '日本' }, { c: 'us', n: '美國' }, { c: 'kr', n: '韓國' },
+            { c: 'cn', n: '中國' }, { c: 'gb', n: '英國' }, { c: 'fr', n: '法國' }, { c: 'de', n: '德國' },
+            { c: 'it', n: '義大利' }, { c: 'ca', n: '加拿大' }, { c: 'au', n: '澳洲' }, { c: 'br', n: '巴西' },
+            { c: 'in', n: '印度' }, { c: 'th', n: '泰國' }, { c: 'vn', n: '越南' }, { c: 'ph', n: '菲律賓' },
+            { c: 'my', n: '馬來西亞' }, { c: 'sg', n: '新加坡' }, { c: 'ch', n: '瑞士' }, { c: 'es', n: '西班牙' },
+            { c: 'ru', n: '俄羅斯' }, { c: 'id', n: '印尼' }, { c: 'mx', n: '墨西哥' }, { c: 'tr', n: '土耳其' }
+        ];
+
         const commonData = {
             animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
             numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
-            colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#000000', '#ffffff', '#ff00ff', '#00ffff', '#808080', '#ffa500'],
+            colors: [
+                {c:'#ff0000', n:'紅'}, {c:'#00ff00', n:'綠'}, {c:'#0000ff', n:'藍'}, 
+                {c:'#ffff00', n:'黃'}, {c:'#000000', n:'黑'}, {c:'#ffffff', n:'白'}, 
+                {c:'#ff00ff', n:'紫'}, {c:'#00ffff', n:'青'}, {c:'#ffa500', n:'橘'}
+            ],
             math: ['+','-','×','÷','=','≠','≈','>','<','π','√','∞','∫','∆','∑','Ω'],
             food: [
-                'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80',
-                'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80',
-                'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&q=80',
-                'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80',
-                'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&q=80',
-                'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=400&q=80',
-                'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&q=80',
-                'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80'
+                { u: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80', n: 'Pizza' },
+                { u: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80', n: 'Burger' },
+                { u: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&q=80', n: 'Sushi' },
+                { u: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80', n: 'Pancake' },
+                { u: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&q=80', n: 'Pasta' },
+                { u: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=400&q=80', n: 'Meatball' },
+                { u: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&q=80', n: 'Drink' },
+                { u: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80', n: 'BBQ' }
             ]
         };
 
@@ -353,49 +446,76 @@
             'yu': ['魚','漁','於','餘','娛','愚','雨','與','予','語','羽','玉','育','預','遇','欲','獄','域']
         };
 
-        let customData = {}; // 本地資料夾圖片
-        let searchData = {}; // 搜尋的圖片
+        let customData = {}; 
+        let searchData = {}; 
+        let tempSearchItems = []; 
 
         let gameState = {
-            round: 0, maxRounds: 3, theme: 'pokemon', bpm: 165,
+            round: 0, maxRounds: 3, theme: 'flags', bpm: 165,
             offset: 0, interval: 0, introSeconds: 2.4, playbackRate: 1.0, 
-            isPaused: false, abortController: null, selectedTheme: 'pokemon',
-            isRecording: false, lockedTheme: null
+            isPaused: false, abortController: null, selectedTheme: 'flags',
+            isRecording: false, 
+            activePool: [], // 記憶池 (8個)
+            hintMode: 'first',
+            history: [] 
         };
 
         let audioCtx;
         let bgmAudio = new Audio();
         bgmAudio.preload = "auto"; 
         
-        // 錄音相關變數
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- 1. 搜尋功能 (Pollinations AI) ---
-        function createSearchTheme() {
-            const keyword = document.getElementById('search-input').value.trim();
-            if (!keyword) return;
+        // --- 1. 搜尋 (LoremFlickr + 多關鍵字) ---
+        function previewSearchImages() {
+            const inputVal = document.getElementById('search-input').value.trim();
+            if (!inputVal) return;
 
-            const themeKey = "search_" + keyword;
-            searchData[themeKey] = [];
+            const keywords = inputVal.split(/[,，]/).map(k => k.trim()).filter(k => k);
+            if (keywords.length === 0) return;
 
-            // 產生 8 個帶隨機數種的 URL，讓 AI 生成該關鍵字的不同圖片
+            const previewArea = document.getElementById('preview-area');
+            const grid = document.getElementById('preview-grid');
+            
+            previewArea.style.display = 'block';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">載入中...</div>';
+            tempSearchItems = [];
+
             for (let i = 0; i < 8; i++) {
-                // Pollinations URL 格式: https://image.pollinations.ai/prompt/{keyword} {seed}
-                const seed = Math.floor(Math.random() * 1000);
-                // encodeURIComponent 確保中文或空格被正確處理
-                const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword)}%20${seed}?nologo=true`;
-                searchData[themeKey].push(url);
+                const keyword = keywords[i % keywords.length]; // 循環使用關鍵字
+                const url = `https://loremflickr.com/320/320/${encodeURIComponent(keyword)}?lock=${Math.floor(Math.random()*1000)}`;
+                tempSearchItems.push({ url: url, label: keyword });
             }
 
-            updateThemeSelect();
-            // 自動選中剛建立的主題
-            document.getElementById('theme-select').value = themeKey;
-            saveSettings();
-            document.getElementById('search-status').innerText = `✅ 已建立主題: ${keyword}`;
+            grid.innerHTML = '';
+            tempSearchItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `
+                    <img src="${item.url}" class="preview-img">
+                    <div class="preview-label">${item.label}</div>
+                `;
+                grid.appendChild(div);
+            });
         }
 
-        // --- 2. 資料夾 & 音樂選取 ---
+        function confirmSearchTheme() {
+            const keyword = document.getElementById('search-input').value.trim();
+            if (!keyword || tempSearchItems.length === 0) return;
+
+            const themeKey = "search_" + keyword;
+            searchData[themeKey] = [...tempSearchItems]; 
+
+            updateThemeSelect();
+            document.getElementById('theme-select').value = themeKey;
+            saveSettings();
+            
+            document.getElementById('preview-area').style.display = 'none'; 
+            document.getElementById('search-status').innerText = `✅ 已套用: ${keyword}`;
+        }
+
+        // --- 2. 資料夾 & 音樂 ---
         document.getElementById('folder-input').addEventListener('change', function(e) {
             const files = e.target.files;
             let count = 0;
@@ -405,7 +525,9 @@
                 const pathParts = file.webkitRelativePath.split('/');
                 let themeName = (pathParts.length > 1) ? pathParts[pathParts.length - 2] : "自訂相簿";
                 if (!customData[themeName]) customData[themeName] = [];
-                customData[themeName].push(URL.createObjectURL(file));
+                // 自動去副檔名
+                const fileName = file.name.replace(/\.[^/.]+$/, "");
+                customData[themeName].push({ url: URL.createObjectURL(file), label: fileName });
                 count++;
             }
             updateThemeSelect();
@@ -415,7 +537,6 @@
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            document.getElementById('drive-input').value = "";
             document.getElementById('file-status').innerText = `⌛ 讀取中...`;
 
             const reader = new FileReader();
@@ -429,21 +550,6 @@
             this.value = ''; 
         });
 
-        function handleDriveLink(url) {
-            if (!url) return;
-            let id = "";
-            const parts = url.match(/[-\w]{25,}/);
-            if (parts) id = parts[0];
-            if (id) {
-                const directUrl = `https://drive.google.com/uc?export=download&id=${id}`;
-                bgmAudio.src = directUrl;
-                bgmAudio.load();
-                document.getElementById('file-status').innerText = `☁️ Drive ID: ${id.substring(0,5)}...`;
-                document.getElementById('music-file').value = "";
-                localStorage.setItem('rg_drive_url', url);
-            }
-        }
-
         function testAudio() {
             if (!bgmAudio.src) { alert("請先選擇檔案！"); return; }
             bgmAudio.volume = 1.0;
@@ -456,12 +562,52 @@
                     setTimeout(() => { bgmAudio.pause(); bgmAudio.currentTime = 0; }, 3000); 
                 })
                 .catch(error => {
-                    alert(`播放失敗 (Error: ${error.name})\n請確認：\n1. 手機未靜音\n2. 檔案非損壞`);
+                    alert(`播放失敗 (Error: ${error.name})`);
                 });
             }
         }
 
-        // --- 3. UI 控制 ---
+        // --- 3. 錄音 ---
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            // HTTPS warning if needed
+        }
+
+        async function startRecording() {
+            if (document.getElementById('record-toggle').value !== 'on') return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                let mimeType = 'audio/webm';
+                if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) {
+                    mimeType = 'audio/mp4'; 
+                }
+                const options = mimeType ? { mimeType } : undefined;
+                mediaRecorder = new MediaRecorder(stream, options);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
+                mediaRecorder.start();
+                gameState.isRecording = true;
+            } catch (err) {
+                console.error("Mic Error:", err);
+                document.getElementById('record-toggle').value = 'off';
+            }
+        }
+
+        function stopRecording() {
+            if (gameState.isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(blob);
+                    const player = document.getElementById('record-player');
+                    player.src = audioUrl;
+                    document.getElementById('audio-player-container').style.display = 'block';
+                };
+                gameState.isRecording = false;
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        // --- 4. UI 控制 ---
         function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
         function closeSettingsBtn() { document.getElementById('settings-modal').style.display = 'none'; }
         function closeSettings(e) { if(e.target.id === 'settings-modal') closeSettingsBtn(); }
@@ -475,6 +621,7 @@
             localStorage.setItem('rg_interval', document.getElementById('interval-input').value);
             localStorage.setItem('rg_rate', document.getElementById('rate-input').value);
             localStorage.setItem('rg_record', document.getElementById('record-toggle').value);
+            localStorage.setItem('rg_hint', document.getElementById('hint-mode').value);
             
             document.getElementById('bpm-display').innerText = document.getElementById('bpm-input').value;
             document.getElementById('interval-display').innerText = document.getElementById('interval-input').value;
@@ -499,23 +646,18 @@
                 document.getElementById('rate-display').innerText = s.getItem('rg_rate');
             }
             if(s.getItem('rg_record')) document.getElementById('record-toggle').value = s.getItem('rg_record');
-            if(s.getItem('rg_drive_url')) {
-                document.getElementById('drive-input').value = s.getItem('rg_drive_url');
-                handleDriveLink(s.getItem('rg_drive_url'));
-            }
+            if(s.getItem('rg_hint')) document.getElementById('hint-mode').value = s.getItem('rg_hint');
         }
 
         function updateThemeSelect() {
             const select = document.getElementById('theme-select');
             
-            // 保留的固定選項 (隨機系列)
             select.innerHTML = `
                 <option value="random_mixed">🧪 大雜燴 (全部混合)</option>
                 <option value="random_round">🎲 隨機 (每回合換)</option>
                 <option value="random_locked">🔒 隨機 (整局鎖定)</option>
             `;
 
-            // 搜尋結果區 (新)
             const searchGroup = document.createElement('optgroup');
             searchGroup.label = "🔍 自訂搜尋結果";
             for (let theme in searchData) {
@@ -526,7 +668,6 @@
             }
             select.appendChild(searchGroup);
 
-            // 本地資料夾
             if (Object.keys(customData).length > 0) {
                 const group = document.createElement('optgroup');
                 group.label = "📂 本地資料夾";
@@ -541,19 +682,19 @@
                 select.appendChild(group);
             }
 
-            // 靜態選項
             select.innerHTML += `
-                <optgroup label="API / 連網主題">
-                    <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
-                    <option value="robots">🤖 機器人 (RoboHash)</option>
-                    <option value="food">🍔 療癒美食 (精選)</option>
-                </optgroup>
-                <optgroup label="內建主題">
+                <optgroup label="內建主題 (附答案)">
+                    <option value="flags">🏳️‍🌈 國旗挑戰</option>
                     <option value="math">➗ 數學符號</option>
                     <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
                     <option value="animals">🦁 動物 Emoji</option>
                     <option value="numbers">🔢 數字</option>
                     <option value="colors">🎨 顏色</option>
+                </optgroup>
+                <optgroup label="API / 連網主題">
+                    <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
+                    <option value="robots">🤖 機器人 (RoboHash)</option>
+                    <option value="food">🍔 療癒美食 (精選)</option>
                 </optgroup>
             `;
             
@@ -567,40 +708,6 @@
             loadSettings();
             updateThemeSelect();
         });
-
-        // --- 4. 錄音功能 ---
-        async function startRecording() {
-            if (document.getElementById('record-toggle').value !== 'on') return;
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-                mediaRecorder.start();
-                gameState.isRecording = true;
-            } catch (err) {
-                console.error("Mic Error:", err);
-                alert("無法啟動麥克風，請確認權限。\n(如果是在 App 內瀏覽器開啟，請改用 Chrome/Safari)");
-                document.getElementById('record-toggle').value = 'off';
-            }
-        }
-
-        function stopRecording() {
-            if (gameState.isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // webm 在 Chrome/Android 支援好
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const player = document.getElementById('record-player');
-                    player.src = audioUrl;
-                    document.getElementById('audio-player-container').style.display = 'block';
-                };
-                gameState.isRecording = false;
-            }
-        }
 
         // --- 5. 遊戲核心 ---
         class SmartTimer {
@@ -634,6 +741,46 @@
             });
         }
 
+        // --- 數據池初始化函式 (記憶模式核心) ---
+        function initActivePool(theme) {
+            let pool = [];
+            
+            if (theme === 'flags') {
+                pool = flagsData.map(f => ({ content: `https://flagcdn.com/h240/${f.c}.png`, label: f.n, theme: 'flags' }));
+            } else if (theme.startsWith('search_')) {
+                // 這裡要使用儲存的 {url, label} 物件
+                pool = searchData[theme].map(item => ({ content: item.url, label: item.label, theme: 'search' }));
+            } else if (theme.startsWith('custom_')) {
+                const real = theme.replace('custom_', '');
+                if (customData[real]) pool = customData[real].map(i => ({ content: i.url, label: i.label, theme: 'custom' }));
+            } else if (theme === 'pokemon') {
+                for(let i=0; i<30; i++) {
+                    const id = Math.floor(Math.random() * 151) + 1;
+                    pool.push({ content: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`, label: 'Pokemon', theme: 'pokemon' });
+                }
+            } else if (theme === 'robots') {
+                for(let i=0; i<30; i++) {
+                    const txt = Math.random().toString(36).substring(7);
+                    pool.push({ content: `https://robohash.org/${txt}?set=set1`, label: 'Robot', theme: 'robots' });
+                }
+            } else if (theme === 'food') {
+                pool = commonData.food.map(f => ({ content: f.u, label: f.n, theme: 'food' }));
+            } else if (theme === 'colors') {
+                pool = commonData.colors.map(c => ({ content: c.c, label: c.n, theme: 'colors' }));
+            } else if (theme === 'chinese_phonetic') {
+                const keys = Object.keys(chineseGroups);
+                const k = keys[Math.floor(Math.random() * keys.length)];
+                pool = chineseGroups[k].map(word => ({ content: word, label: word, theme: 'chinese_phonetic' }));
+            } else if (commonData[theme]) {
+                pool = commonData[theme].map(item => ({ content: item, label: item, theme: theme }));
+            } else {
+                pool = commonData.animals.map(item => ({ content: item, label: 'Animal', theme: 'animals' }));
+            }
+
+            // 洗牌並取前 8 個作為本局固定題庫
+            return pool.sort(() => 0.5 - Math.random()).slice(0, 8);
+        }
+
         async function startGame() {
             gameState.maxRounds = parseInt(document.getElementById('round-select').value);
             gameState.selectedTheme = document.getElementById('theme-select').value;
@@ -642,18 +789,26 @@
             gameState.interval = parseFloat(document.getElementById('interval-input').value);
             gameState.introSeconds = parseFloat(document.getElementById('intro-seconds-input').value) || 0;
             gameState.playbackRate = parseFloat(document.getElementById('rate-input').value) || 1.0;
+            gameState.hintMode = document.getElementById('hint-mode').value;
+            
             gameState.round = 0;
             gameState.abortController = new AbortController();
-            gameState.lockedTheme = null; // 重置鎖定主題
+            gameState.history = []; 
             window.currentTimers = [];
 
-            // 處理「隨機(整局鎖定)」邏輯
-            if (gameState.selectedTheme === 'random_locked') {
-                const allT = getAllThemes().filter(t => !t.startsWith('random')); // 排除隨機選項
-                gameState.lockedTheme = allT[Math.floor(Math.random() * allT.length)];
+            // 決定本局主題 & 初始化記憶池
+            let finalTheme = gameState.selectedTheme;
+            if (finalTheme === 'random_locked') {
+                const allT = getAllThemes().filter(t => !t.startsWith('random'));
+                finalTheme = allT[Math.floor(Math.random() * allT.length)];
             }
+            
+            // 如果不是混合/每回隨機，則初始化固定池
+            if (finalTheme !== 'random_mixed' && finalTheme !== 'random_round') {
+                gameState.activePool = initActivePool(finalTheme);
+            }
+            gameState.currentRunTheme = finalTheme;
 
-            // Audio Unlock
             if (bgmAudio.src) {
                 try {
                     bgmAudio.volume = 0; 
@@ -666,49 +821,30 @@
 
             document.getElementById('home-screen').classList.add('hidden');
             document.getElementById('end-screen').style.display = 'none';
-            document.getElementById('audio-player-container').style.display = 'none'; // 隱藏播放器
+            document.getElementById('audio-player-container').style.display = 'none';
             document.getElementById('game-screen').style.display = 'flex';
             document.getElementById('total-rounds').innerText = gameState.maxRounds;
 
-            // 啟動錄音
             startRecording();
-
             runGameLoop();
         }
 
-        function getItem(theme) {
-            // 搜尋結果
-            if (theme.startsWith('search_')) {
-                const pool = searchData[theme];
-                if (pool) return pool[Math.floor(Math.random() * pool.length)];
-            }
-            // 本地
-            if (theme.startsWith('custom_')) {
-                const real = theme.replace('custom_', '');
-                if (customData[real]) return customData[real][Math.floor(Math.random() * customData[real].length)];
-            }
-            if (theme === 'pokemon') {
-                const id = Math.floor(Math.random() * 151) + 1;
-                return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
-            }
-            if (theme === 'robots') {
-                const txt = Math.random().toString(36).substring(7);
-                return `https://robohash.org/${txt}?set=set1`;
-            }
-            if (theme === 'chinese_phonetic') {
-                const keys = Object.keys(chineseGroups);
-                const k = keys[Math.floor(Math.random() * keys.length)];
-                return chineseGroups[k][Math.floor(Math.random() * chineseGroups[k].length)];
-            }
-            if (commonData[theme]) return commonData[theme][Math.floor(Math.random() * commonData[theme].length)];
-            return "🐶";
-        }
-
         function getAllThemes() {
-            let t = ['pokemon', 'robots', 'food', 'math', 'chinese_phonetic', 'animals', 'numbers', 'colors'];
+            let t = ['flags', 'pokemon', 'robots', 'food', 'math', 'chinese_phonetic', 'animals', 'numbers', 'colors'];
             for (let k in customData) t.push('custom_' + k);
             for (let k in searchData) t.push(k);
             return t;
+        }
+
+        function getMixedItems() {
+            const allT = getAllThemes();
+            let items = [];
+            for(let i=0; i<8; i++) {
+                const t = allT[Math.floor(Math.random() * allT.length)];
+                const pool = initActivePool(t);
+                items.push(pool[0]);
+            }
+            return items;
         }
 
         async function runGameLoop() {
@@ -719,16 +855,6 @@
                     gameState.round++;
                     document.getElementById('current-round').innerText = gameState.round;
                     
-                    let curTheme = gameState.selectedTheme;
-                    const allT = getAllThemes();
-
-                    // 主題選擇邏輯
-                    if (gameState.selectedTheme === 'random_locked') {
-                        curTheme = gameState.lockedTheme; // 使用遊戲開始時鎖定的主題
-                    } else if (gameState.selectedTheme === 'random_round') {
-                        curTheme = allT[Math.floor(Math.random() * allT.length)];
-                    }
-
                     if (bgmAudio.src) {
                         if (gameState.offset < 0) {
                             bgmAudio.currentTime = 0;
@@ -744,52 +870,54 @@
                     grid.innerHTML = '';
                     let items = [];
 
-                    if (gameState.selectedTheme === 'random_mixed') {
-                        for(let i=0; i<8; i++) {
-                            const rt = allT[Math.floor(Math.random() * allT.length)];
-                            items.push({ val: getItem(rt), theme: rt });
-                        }
+                    // 題目產生邏輯
+                    if (gameState.currentRunTheme === 'random_mixed') {
+                        items = getMixedItems();
+                    } else if (gameState.currentRunTheme === 'random_round') {
+                        const allT = getAllThemes();
+                        const t = allT[Math.floor(Math.random() * allT.length)];
+                        items = initActivePool(t);
                     } else {
-                        // 單一主題
-                        if (curTheme === 'chinese_phonetic') {
-                            const keys = Object.keys(chineseGroups);
-                            const k = keys[Math.floor(Math.random() * keys.length)];
-                            const slice = chineseGroups[k].sort(() => 0.5 - Math.random()).slice(0, 8);
-                            items = slice.map(v => ({ val: v, theme: curTheme }));
-                        } else if (curTheme.startsWith('custom_')) {
-                            const real = curTheme.replace('custom_', '');
-                            const pool = customData[real];
-                            for(let i=0; i<8; i++) items.push({ val: pool[Math.floor(Math.random()*pool.length)], theme: curTheme });
-                        } else if (curTheme.startsWith('search_')) {
-                            const pool = searchData[curTheme];
-                            for(let i=0; i<8; i++) items.push({ val: pool[Math.floor(Math.random()*pool.length)], theme: curTheme });
-                        } else if (['pokemon','robots'].includes(curTheme)) {
-                            for(let i=0; i<8; i++) items.push({ val: getItem(curTheme), theme: curTheme });
-                        } else {
-                            const pool = commonData[curTheme] || commonData['animals'];
-                            const slice = [...pool].sort(()=>0.5-Math.random()).slice(0,8);
-                            items = slice.map(v => ({ val: v, theme: curTheme }));
-                        }
+                        // 固定主題：從 activePool (8個) 中重新洗牌
+                        items = [...gameState.activePool].sort(() => 0.5 - Math.random());
                     }
+                    
+                    gameState.history.push({ round: gameState.round, items: items });
+
+                    let showHint = false;
+                    if (gameState.hintMode === 'always') showHint = true;
+                    if (gameState.hintMode === 'first' && gameState.round === 1) showHint = true;
 
                     items.forEach(obj => {
                         const card = document.createElement('div');
                         card.className = 'card';
-                        const isUrl = typeof obj.val === 'string' && (obj.val.startsWith('http') || obj.val.startsWith('blob:'));
+                        if (showHint) card.classList.add('show-hint');
+
+                        const content = document.createElement('div');
+                        content.className = 'card-content';
+
+                        const isUrl = typeof obj.content === 'string' && (obj.content.startsWith('http') || obj.content.startsWith('blob:'));
                         
                         if (isUrl) {
                             card.classList.add('contain-img');
-                            card.innerHTML = `<img src="${obj.val}">`;
+                            content.innerHTML = `<img src="${obj.content}" onerror="this.src='https://placehold.co/200x200?text=Error'">`;
                         } else if (obj.theme === 'colors') {
                             card.classList.add('color-card');
-                            card.style.backgroundColor = obj.val;
-                            if(obj.val === '#ffffff') card.style.borderColor = '#ddd';
+                            card.style.backgroundColor = obj.content;
+                            if(obj.content === '#ffffff') card.style.borderColor = '#ddd';
                         } else {
-                            card.innerText = obj.val;
+                            content.innerText = obj.content;
                             if(obj.theme === 'numbers') card.classList.add('number-mode');
                             if(obj.theme === 'math') card.classList.add('math-mode');
                             if(obj.theme === 'chinese_phonetic') card.classList.add('chinese-mode');
                         }
+                        
+                        const label = document.createElement('div');
+                        label.className = 'answer-label';
+                        label.innerText = obj.label;
+
+                        card.appendChild(content);
+                        card.appendChild(label);
                         grid.appendChild(card);
                     });
 
@@ -814,11 +942,47 @@
         }
 
         function showEndScreen() {
-            stopRecording(); // 停止錄音
+            stopRecording();
             bgmAudio.pause();
             document.getElementById('game-screen').style.display = 'none';
             document.getElementById('end-screen').style.display = 'flex';
             document.getElementById('home-screen').classList.add('hidden');
+
+            const historyDiv = document.getElementById('game-history');
+            historyDiv.innerHTML = '';
+            
+            gameState.history.forEach(h => {
+                const roundBlock = document.createElement('div');
+                roundBlock.className = 'history-round';
+                
+                const title = document.createElement('div');
+                title.className = 'history-title';
+                title.innerText = `Round ${h.round}`;
+                roundBlock.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.className = 'history-grid';
+
+                h.items.forEach(item => {
+                    const cell = document.createElement('div');
+                    cell.className = 'history-item';
+                    
+                    let visual = '';
+                    if (item.theme === 'colors') {
+                        visual = `<div class="history-thumb" style="background:${item.content};"></div>`;
+                    } else if (item.content.startsWith && (item.content.startsWith('http') || item.content.startsWith('blob:'))) {
+                        visual = `<img class="history-thumb" src="${item.content}">`;
+                    } else {
+                        visual = `<div class="history-thumb">${item.content}</div>`;
+                    }
+                    
+                    cell.innerHTML = `${visual}<div class="history-name">${item.label}</div>`;
+                    grid.appendChild(cell);
+                });
+
+                roundBlock.appendChild(grid);
+                historyDiv.appendChild(roundBlock);
+            });
         }
 
         function togglePause() {
