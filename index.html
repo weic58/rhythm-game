@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>節奏遊戲 Plus</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
     <style>
         :root {
             --primary-color: #ff4757;
@@ -29,7 +30,7 @@
             -webkit-user-select: none;
         }
 
-        /* 按鈕樣式 */
+        /* 通用按鈕 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -62,7 +63,7 @@
             border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-left: 5px;
         }
 
-        /* 預覽區的小按鈕群 */
+        /* 預覽區的小按鈕群 (恢復此樣式) */
         .preview-actions {
             position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; z-index: 10;
         }
@@ -81,6 +82,8 @@
             display: flex; flex-direction: column; align-items: center; gap: 15px;
         }
         #settings-trigger { position: absolute; top: -80px; right: 20px; }
+        #mute-home { position: absolute; top: -80px; left: 20px; }
+        
         h1 { font-size: 2.5rem; color: #333; margin-bottom: 5px; }
 
         /* 設定選單 */
@@ -176,7 +179,6 @@
         }
         
         .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-        /* 國旗跟寶可夢適合 contain */
         .card.contain-img img { object-fit: contain; width: 90%; height: 90%; }
         
         .card.chinese-mode .card-content { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; color: #d63031; }
@@ -247,9 +249,12 @@
 <body>
 
     <div id="home-screen">
+        <button id="mute-home" class="icon-btn" onclick="toggleMute()" title="靜音">🔊</button>
         <button id="settings-trigger" class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
         <h1>🎵 節奏遊戲</h1>
-        
+        <p style="color: #888; font-size: 1rem; margin-top: -10px; font-weight: bold;">
+    Created by weic58 and Google Gemini
+	</p>
         <div class="theme-selector">
             <label style="font-weight:bold; color:#555;">選擇主題</label>
             <select id="theme-select" onchange="saveSettings()">
@@ -300,7 +305,7 @@
             <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
                 <label style="color:#54a0ff;">🔍 維基百科搜尋 (支援換圖/刪除)</label>
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="search-input" placeholder="輸入: 香蕉,蘋果,西瓜">
+                    <input type="text" id="search-input" placeholder="輸入: 香蕉,蘋果 (以逗號或空格分隔)">
                     <button class="btn-action" onclick="searchWikiImages()">搜尋</button>
                 </div>
                 
@@ -379,7 +384,7 @@
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
                 <input type="number" id="intro-seconds-input" value="2.5" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
-		<div style="text-align:right; font-weight:bold; color:#555;">0.5倍速請調成5秒</div>
+                <div style="text-align:right; font-weight:bold; color:#555;">0.5倍速請調成5.0/5.5秒(電腦/手機)</div>
             </div>
 
             <div class="control-group">
@@ -396,6 +401,7 @@
         <div class="top-bar">
             <button class="icon-btn" onclick="goHome()" title="回首頁">🏠</button>
             <div class="top-right-controls">
+                <button id="mute-game" class="icon-btn" onclick="toggleMute()" title="靜音">🔊</button>
                 <button class="icon-btn" id="pause-btn" onclick="togglePause()" title="暫停">⏸</button>
                 <button class="icon-btn" onclick="restartGame()" title="重置">🔄</button>
             </div>
@@ -430,7 +436,7 @@
 
     <script>
         // --- 1. 資料庫 ---
-        // 國旗 (FlagCDN w640 high res)
+        // 國旗 (FlagCDN)
         const flagsData = [
             { c: 'tw', n: '台灣' }, { c: 'jp', n: '日本' }, { c: 'us', n: '美國' }, { c: 'kr', n: '韓國' },
             { c: 'cn', n: '中國' }, { c: 'gb', n: '英國' }, { c: 'fr', n: '法國' }, { c: 'de', n: '德國' },
@@ -481,6 +487,7 @@
             activePool: [], 
             hintMode: 'first',
             uniqueCount: 8, 
+            isMuted: false, 
             history: [] 
         };
 
@@ -491,29 +498,29 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- 1. 搜尋 (Wikipedia API + 精準過濾 + 刪除功能) ---
+        // --- 1. 搜尋 (改回 Wikipedia API - 較精準) ---
         async function searchWikiImages() {
             const inputVal = document.getElementById('search-input').value.trim();
             if (!inputVal) return;
 
-            const keywords = inputVal.split(/[,，]/).map(k => k.trim()).filter(k => k);
+            // [,，\s] 代表：逗號 OR 全形逗號 OR 任何空白(包含全形空格)
+            // + 代表：如果連續輸入多個空格，視為一個分隔符
+            const keywords = inputVal.split(/[,，\s]+/).map(k => k.trim()).filter(k => k);
+
             if (keywords.length === 0) return;
 
             const previewArea = document.getElementById('preview-area');
             const grid = document.getElementById('preview-grid');
             
             previewArea.style.display = 'block';
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋中... (過濾無關圖片)</div>';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋維基百科條目中...</div>';
             tempSearchItems = [];
 
-            // 每個關鍵字準備 slot
-            // 允許關鍵字重複出現 (如果你輸入 "蘋果,蘋果" 就會搜兩次)
-            // 但為了UI呈現，這裡如果關鍵字少於8個，我們會循環補滿
             let fullKeywords = [];
             while(fullKeywords.length < 8) {
                 fullKeywords = fullKeywords.concat(keywords);
             }
-            fullKeywords = fullKeywords.slice(0, 8); // 取前8個
+            fullKeywords = fullKeywords.slice(0, 8); 
 
             for (let i = 0; i < 8; i++) {
                 tempSearchItems.push({
@@ -528,8 +535,8 @@
 
             for (let kw of uniqueKeywords) {
                 try {
-                    // Wiki API: generator=images (抓頁面內所有圖) + pageimages (抓縮圖)
-                    const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(kw)}&gsrlimit=1&prop=images|pageimages&imlimit=50&pithumbsize=400&format=json&origin=*`;
+                    // 改回 zh.wikipedia.org，抓取條目縮圖 (pageimages)
+                    const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(kw)}&gsrlimit=20&prop=pageimages&pithumbsize=400&format=json&origin=*`;
                     
                     const res = await fetch(url);
                     const data = await res.json();
@@ -537,36 +544,12 @@
                     keywordImageMap[kw] = [];
                     
                     if (data.query && data.query.pages) {
-                        const page = Object.values(data.query.pages)[0];
-                        
-                        // 1. 優先：Page Image (縮圖)
-                        if (page.thumbnail && page.thumbnail.source) {
-                            keywordImageMap[kw].push(page.thumbnail.source);
-                        }
-
-                        // 2. 其次：頁面內的其他圖片 (需二次查詢取得 URL)
-                        if (page.images) {
-                            const imageTitles = page.images.map(img => img.title)
-                                .filter(title => !title.match(/\.(svg|tif|tiff)$/i)) // 過濾向量圖/icon
-                                .filter(title => !title.match(/logo|icon|symbol|stub|flag|map/i)) // 過濾圖標
-                                .slice(0, 20); // 取前20張
-
-                            if (imageTitles.length > 0) {
-                                // 批量查詢圖片網址
-                                const titlesParam = imageTitles.join('|');
-                                const imgUrlApi = `https://zh.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titlesParam)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
-                                const imgRes = await fetch(imgUrlApi);
-                                const imgData = await imgRes.json();
-                                
-                                if (imgData.query && imgData.query.pages) {
-                                    Object.values(imgData.query.pages).forEach(p => {
-                                        if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].url) {
-                                            keywordImageMap[kw].push(p.imageinfo[0].url);
-                                        }
-                                    });
-                                }
+                        Object.values(data.query.pages).forEach(page => {
+                            // 判斷是否有縮圖
+                            if (page.thumbnail && page.thumbnail.source) {
+                                keywordImageMap[kw].push(page.thumbnail.source);
                             }
-                        }
+                        });
                     }
                     
                     if (keywordImageMap[kw].length === 0) {
@@ -589,7 +572,6 @@
             grid.innerHTML = '';
             
             tempSearchItems.forEach((slot, index) => {
-                // 如果該 slot 被標記為刪除，就不渲染
                 if (slot.deleted) return;
 
                 const div = document.createElement('div');
@@ -614,23 +596,19 @@
             if (slot && slot.images.length > 1) {
                 slot.currentIndex++;
                 const newImg = slot.images[slot.currentIndex % slot.images.length];
-                const imgEl = document.getElementById(`prev-img-${index}`);
-                if(imgEl) imgEl.src = newImg;
+                document.getElementById(`prev-img-${index}`).src = newImg;
             }
         }
 
         function removePreviewImage(index) {
             if(tempSearchItems[index]) {
                 tempSearchItems[index].deleted = true;
-                // 重新渲染 grid
                 renderPreviewGrid();
             }
         }
 
         function confirmSearchTheme() {
-            // 過濾掉被刪除的
             const activeItems = tempSearchItems.filter(item => !item.deleted);
-
             if (activeItems.length === 0) {
                 alert("請至少保留一張圖片！");
                 return;
@@ -689,7 +667,7 @@
 
         function testAudio() {
             if (!bgmAudio.src) { alert("請先選擇檔案！"); return; }
-            bgmAudio.volume = 1.0;
+            bgmAudio.volume = gameState.isMuted ? 0 : 1.0;
             bgmAudio.playbackRate = parseFloat(document.getElementById('rate-input').value);
             
             const playPromise = bgmAudio.play();
@@ -702,6 +680,15 @@
                     alert(`播放失敗 (Error: ${error.name})`);
                 });
             }
+        }
+
+        // --- 靜音功能 ---
+        function toggleMute() {
+            gameState.isMuted = !gameState.isMuted;
+            bgmAudio.muted = gameState.isMuted;
+            const icon = gameState.isMuted ? '🔇' : '🔊';
+            document.getElementById('mute-home').innerText = icon;
+            document.getElementById('mute-game').innerText = icon;
         }
 
         // --- 3. 錄音 ---
@@ -880,14 +867,14 @@
             });
         }
 
-        // --- 數據池初始化函式 (自動補滿 & 重複處理) ---
+        // --- 數據池初始化 ---
         function initActivePool(theme) {
             let pool = [];
             
             if (theme === 'flags') {
                 pool = flagsData.map(f => ({ content: `https://flagcdn.com/w640/${f.c}.png`, label: f.n, theme: 'flags' }));
             } else if (theme.startsWith('search_')) {
-                // 使用搜尋結果 (已經是固定好的圖片)
+                // 使用搜尋結果
                 pool = searchData[theme].map(item => ({ content: item.url, label: item.label, theme: 'search' }));
             } else if (theme.startsWith('custom_')) {
                 const real = theme.replace('custom_', '');
@@ -961,13 +948,16 @@
             }
             gameState.currentRunTheme = finalTheme;
 
+            // 靜音控制
+            bgmAudio.muted = gameState.isMuted;
+
             if (bgmAudio.src) {
                 try {
                     bgmAudio.volume = 0; 
                     await bgmAudio.play();
                     bgmAudio.pause();
                     bgmAudio.currentTime = 0;
-                    bgmAudio.volume = 1; 
+                    if (!gameState.isMuted) bgmAudio.volume = 1;
                 } catch (e) { console.log("Unlock failed"); }
             }
 
