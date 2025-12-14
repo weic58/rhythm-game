@@ -92,6 +92,18 @@
         .btn-swap { background: rgba(84, 160, 255, 0.9); }
         .btn-remove { background: rgba(255, 107, 107, 0.9); }
         .btn-mini:hover { transform: scale(1.1); }
+        /* --- CSS 新增部分 --- */
+        .btn-ai-mini { 
+            background: #a55eea; /* 紫色 */
+            color: white; border: none; border-radius: 50%; width: 24px; height: 24px;
+            font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .btn-ai-mini:hover { transform: scale(1.1); }
+        
+        .preview-header-controls {
+            display: flex; justify-content: space-between; margin-bottom: 10px;
+        }
 
         .preview-img {
             width: 100%; height: 160px; 
@@ -327,22 +339,28 @@
             </div>
 
             <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
-                <label style="color:#54a0ff;">🔍維基百科圖片搜尋</label>
+                <label style="color:#54a0ff;">🔍 維基圖庫搜尋 / 自訂編輯</label>
                 
                 <div style="margin-bottom:8px;">
-                    <input type="text" id="custom-theme-title" placeholder="設定主題名稱 (選填，例: 漫威英雄)">
+                    <input type="text" id="custom-theme-title" placeholder="設定主題名稱 (選填)">
                 </div>
 
                 <div style="display:flex; gap:5px;">
                     <input type="text" id="search-input" placeholder="輸入: 香蕉 蘋果, 'Iron Man'">
                     <button class="btn-action" onclick="searchWikiImages()">搜尋</button>
-                </div>
+                    </div>
                 
                 <div id="preview-area">
-                    <div style="font-size:0.8rem; margin-bottom:5px; color:#555;">
-                        預覽 (可編輯文字/換圖/刪除):
+                    <div class="preview-header-controls">
+                        <div style="font-size:0.8rem; color:#555; align-self:center;">預覽編輯區:</div>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-test" onclick="addPreviewSlot()">➕ 新增一格</button>
+                            <button class="btn-test" style="background:#ff6b6b; color:white;" onclick="clearPreviewSlots()">🗑️ 清除</button>
+                        </div>
                     </div>
+
                     <div id="preview-grid"></div>
+                    
                     <div class="preview-controls">
                         <button class="btn-action" style="background:#2ed573;" onclick="confirmSearchTheme()">✅ 確認使用</button>
                     </div>
@@ -528,10 +546,41 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- 1. 搜尋 (智慧模式：單詞自動擴充 vs 多詞精準搜尋) ---
+        // --- 1. 搜尋 (優先級：引號 > 逗號 > 空格) ---
         async function searchWikiImages() {
             const inputVal = document.getElementById('search-input').value.trim();
             if (!inputVal) return;
+
+            let keywords = [];
+            
+            // 判斷是否有全形或半形逗號
+            const hasComma = /[,，]/.test(inputVal);
+
+            if (hasComma) {
+                // 【模式 A：逗號優先】
+                // 邏輯：有逗號時，空格失效，只認逗號分隔。
+                // 這樣 "Iron Man, Thor" 會被切成 ["Iron Man", "Thor"]
+                
+                // 1. 先用逗號切開
+                let parts = inputVal.split(/[,，]/);
+                
+                // 2. 清理每個部分 (去掉前後空白，去掉多餘引號)
+                keywords = parts.map(k => k.trim().replace(/^"|"$/g, '')).filter(k => k);
+            
+            } else {
+                // 【模式 B：空格優先】(沒有逗號時)
+                // 邏輯：支援 "Iron Man" Hulk -> ["Iron Man", "Hulk"]
+                
+                // 正則：抓取 "雙引號內容" 或 "非空白字串"
+                const regex = /"[^"]*"|[^\s]+/g;
+                const matches = inputVal.match(regex);
+                
+                if (matches) {
+                    keywords = matches.map(k => k.replace(/^"|"$/g, '').trim());
+                }
+            }
+
+            if (keywords.length === 0) return;
 
             const previewArea = document.getElementById('preview-area');
             const grid = document.getElementById('preview-grid');
@@ -540,46 +589,29 @@
             grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋中...</div>';
             tempSearchItems = [];
 
-            // 1. 切割關鍵字
-            const regex = /"[^"]*"|[^,，\s]+/g;
-            const matches = inputVal.match(regex);
-            
-            if (!matches) {
-                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">請輸入關鍵字</div>';
-                return;
-            }
+            // --- 判斷要走「單一主題擴充」還是「指定搜尋」 ---
 
-            const keywords = matches.map(k => k.replace(/^"|"$/g, '').trim());
-
-            // 2. 分流邏輯
+            // 如果只有 1 個關鍵字 (例如輸入 "Marvel" 或 "Iron Man")
             if (keywords.length === 1) {
-                // === 模式 A：單一主題擴充 (輸入 "Marvel" -> 找 8 個相關) ===
                 const theme = keywords[0];
                 grid.innerHTML = `<div style="grid-column:1/-1; text-align:center;">正在尋找與「${theme}」相關的項目...</div>`;
                 
                 try {
-                    // 搜尋維基百科相關條目 (抓前 20 個結果來篩選)
+                    // 單一主題：搜尋維基百科相關條目 (抓前 20 個結果來篩選 8 個)
                     const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(theme)}&gsrlimit=20&prop=pageimages&pithumbsize=320&format=json&origin=*`;
                     const res = await fetch(url);
                     const data = await res.json();
 
                     if (data.query && data.query.pages) {
-                        // 將結果轉為陣列
                         const pages = Object.values(data.query.pages);
-                        
-                        // 過濾出有圖片的條目
+                        // 過濾有圖的
                         const validPages = pages.filter(p => p.thumbnail && p.thumbnail.source);
-
-                        // 取前 8 個 (如果不夠 8 個就全取)
+                        // 取前 8 個
                         const results = validPages.slice(0, 8);
 
-                        // 建立預覽項目
                         results.forEach(page => {
-                            // 這裡我們把每個結果都視為一個獨立的 slot
-                            // 為了支援「換圖」，我們把該條目的縮圖當作 images[0]
-                            // (註：主題擴充模式下，暫時不支援單卡換圖，因為它是獨一無二的條目)
                             tempSearchItems.push({
-                                label: page.title, // 自動使用條目名稱 (如 "蜘蛛人")
+                                label: page.title,
                                 images: [page.thumbnail.source],
                                 currentIndex: 0
                             });
@@ -588,8 +620,8 @@
                 } catch(e) { console.error(e); }
 
             } else {
-                // === 模式 B：多關鍵字精準搜尋 (維持原樣) ===
-                // 輸入 "Iron Man, Thor" -> 建立兩個 slot
+                // 如果有多個關鍵字 (例如 "Iron Man, Thor") -> 進入精準搜尋模式
+                // 1. 根據關鍵字建立 slot (不補滿，有幾個顯示幾個)
                 for (let i = 0; i < keywords.length; i++) {
                     tempSearchItems.push({
                         label: keywords[i],
@@ -597,13 +629,13 @@
                         currentIndex: 0
                     });
                 }
-                // 批量搜尋這些關鍵字
+                // 2. 批量去圖庫抓圖
                 await performBatchSearch(keywords);
             }
 
-            // 3. 渲染結果
+            // 渲染
             if (tempSearchItems.length === 0) {
-                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">找不到相關圖片，請換個關鍵字</div>';
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">找不到圖片，請換個關鍵字</div>';
             } else {
                 renderPreviewGrid();
             }
@@ -690,6 +722,56 @@
             }
         }
 
+        // --- JS 新增與修改部分 ---
+
+        // 1. 新增空白格子
+        function addPreviewSlot() {
+            tempSearchItems.push({
+                label: "New Item",
+                images: [],
+                currentIndex: 0
+            });
+            renderPreviewGrid();
+        }
+
+        // 2. 清除所有格子
+        function clearPreviewSlots() {
+            if(confirm("確定要清空目前預覽的所有圖片嗎？")) {
+                tempSearchItems = [];
+                renderPreviewGrid();
+            }
+        }
+
+        // 3. 單格 AI 生成 (新功能)
+        async function generateSingleSlotAI(index) {
+            const inputEl = document.getElementById(`input-${index}`);
+            const keyword = inputEl.value.trim();
+            if (!keyword) { alert("請先輸入關鍵字"); return; }
+
+            const imgEl = document.getElementById(`prev-img-${index}`);
+            imgEl.style.opacity = 0.5; // 讀取中效果
+
+            const seed = Math.floor(Math.random() * 100000);
+            const prompt = `photo of ${keyword}, realistic, 8k, highly detailed`;
+            const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&nologo=true`;
+
+            // 預加載圖片確保成功
+            const tempImg = new Image();
+            tempImg.onload = () => {
+                tempSearchItems[index].label = keyword;
+                tempSearchItems[index].images = [newUrl]; // AI圖直接覆蓋
+                tempSearchItems[index].currentIndex = 0;
+                imgEl.src = newUrl;
+                imgEl.style.opacity = 1;
+            };
+            tempImg.onerror = () => {
+                alert("AI 生成失敗，請稍後再試");
+                imgEl.style.opacity = 1;
+            };
+            tempImg.src = newUrl;
+        }
+
+        // 4. 更新渲染函式 (加入 AI 按鈕)
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
@@ -704,7 +786,8 @@
                 
                 div.innerHTML = `
                     <div class="preview-toolbar">
-                        <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張">🔄</button>
+                        <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="用關鍵字AI生成">✨</button>
+                        <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張(維基)">🔄</button>
                         <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
                     </div>
                     
@@ -712,7 +795,7 @@
                     
                     <div class="preview-edit">
                         <input type="text" class="preview-input" value="${slot.label}" id="input-${index}" onkeydown="if(event.key==='Enter') updateSingleSlot(${index})">
-                        <button class="preview-btn-search" onclick="updateSingleSlot(${index})" title="搜尋這個關鍵字">🔎</button>
+                        <button class="preview-btn-search" onclick="updateSingleSlot(${index})" title="搜尋維基">🔎</button>
                     </div>
                 `;
                 grid.appendChild(div);
