@@ -9,6 +9,7 @@
             --primary-color: #ff4757;
             --secondary-color: #2ed573;
             --accent-color: #54a0ff;
+            --danger-color: #ff6b6b;
             --bg-color: #f1f2f6;
             --box-bg: #ffffff;
             --modal-bg: rgba(0, 0, 0, 0.7);
@@ -60,6 +61,19 @@
             background-color: #a4b0be; color: white; border: none; padding: 5px 10px;
             border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-left: 5px;
         }
+
+        /* 預覽區的小按鈕群 */
+        .preview-actions {
+            position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; z-index: 10;
+        }
+        .btn-mini {
+            color: white; border: none; border-radius: 50%; width: 24px; height: 24px;
+            font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .btn-swap { background: rgba(84, 160, 255, 0.9); }
+        .btn-remove { background: rgba(255, 107, 107, 0.9); }
+        .btn-mini:hover { transform: scale(1.1); }
 
         /* 主畫面 */
         #home-screen {
@@ -118,13 +132,13 @@
         #preview-grid {
             display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px;
         }
-        .preview-item { position: relative; }
+        .preview-item { position: relative; border: 1px solid #eee; border-radius: 4px; overflow: hidden; background: #f9f9f9; aspect-ratio: 1; }
         .preview-img {
-            width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; background: #eee;
+            width: 100%; height: 100%; object-fit: contain; display: block;
         }
         .preview-label {
             position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6);
-            color: white; font-size: 0.6rem; text-align: center; overflow: hidden; white-space: nowrap;
+            color: white; font-size: 0.6rem; text-align: center; overflow: hidden; white-space: nowrap; padding: 2px 0;
         }
         .preview-controls { display: flex; gap: 10px; justify-content: flex-end; }
 
@@ -162,6 +176,7 @@
         }
         
         .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        /* 國旗跟寶可夢適合 contain */
         .card.contain-img img { object-fit: contain; width: 90%; height: 90%; }
         
         .card.chinese-mode .card-content { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; color: #d63031; }
@@ -175,7 +190,6 @@
             position: absolute; bottom: 0; left: 0; font-weight: bold;
             text-shadow: 1px 1px 0 #000;
         }
-        
         .card.show-hint .answer-label { display: block; }
 
         .card.active {
@@ -246,8 +260,8 @@
                 <optgroup label="🔍 自訂搜尋">
                     </optgroup>
 
-                <optgroup label="內建主題 (附答案)">
-                    <option value="flags">🏳️‍🌈 國旗挑戰 (New!)</option>
+                <optgroup label="內建主題">
+                    <option value="flags">🗺️ 國旗挑戰</option>
                     <option value="math">➗ 數學符號</option>
                     <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
                     <option value="animals">🦁 動物 Emoji</option>
@@ -284,17 +298,16 @@
             </div>
 
             <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
-                <label style="color:#54a0ff;">🔍 關鍵字搜尋 (支援多詞)</label>
+                <label style="color:#54a0ff;">🔍 維基百科搜尋 (支援換圖/刪除)</label>
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="search-input" placeholder="輸入: Cat,Dog,Bird (逗號分隔)">
-                    <button class="btn-action" onclick="previewSearchImages()">搜尋</button>
+                    <input type="text" id="search-input" placeholder="輸入: 香蕉,蘋果,西瓜">
+                    <button class="btn-action" onclick="searchWikiImages()">搜尋</button>
                 </div>
                 
                 <div id="preview-area">
-                    <div style="font-size:0.8rem; margin-bottom:5px; color:#555;">預覽 (答案即為關鍵字):</div>
+                    <div style="font-size:0.8rem; margin-bottom:5px; color:#555;">預覽 (按🔄換圖, ❌刪除):</div>
                     <div id="preview-grid"></div>
                     <div class="preview-controls">
-                        <button class="btn-test" onclick="previewSearchImages()">🔄 重骰</button>
                         <button class="btn-action" style="background:#2ed573;" onclick="confirmSearchTheme()">✅ 確認使用</button>
                     </div>
                 </div>
@@ -328,7 +341,16 @@
                     <option value="always">每回合都顯示 (練習)</option>
                     <option value="none">隱藏 (考試)</option>
                 </select>
-                <small style="color:#888;">*選擇國旗等主題時，後面回合會考你第一回合的內容</small>
+            </div>
+
+            <div class="control-group">
+                <label>🔂 同一回合題目重複度:</label>
+                <select id="unique-count" onchange="saveSettings()">
+                    <option value="8">8 張都不一樣 (預設)</option>
+                    <option value="4">4 種圖 (各出現2次)</option>
+                    <option value="2">2 種圖 (各出現4次)</option>
+                    <option value="1">1 種圖 (全部相同)</option>
+                </select>
             </div>
 
             <div class="control-group">
@@ -356,7 +378,8 @@
 
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
-                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
+                <input type="number" id="intro-seconds-input" value="2.5" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
+		<div style="text-align:right; font-weight:bold; color:#555;">0.5倍速請調成5秒</div>
             </div>
 
             <div class="control-group">
@@ -407,7 +430,7 @@
 
     <script>
         // --- 1. 資料庫 ---
-        // 國旗 (FlagCDN)
+        // 國旗 (FlagCDN w640 high res)
         const flagsData = [
             { c: 'tw', n: '台灣' }, { c: 'jp', n: '日本' }, { c: 'us', n: '美國' }, { c: 'kr', n: '韓國' },
             { c: 'cn', n: '中國' }, { c: 'gb', n: '英國' }, { c: 'fr', n: '法國' }, { c: 'de', n: '德國' },
@@ -448,15 +471,16 @@
 
         let customData = {}; 
         let searchData = {}; 
-        let tempSearchItems = []; 
+        let tempSearchItems = []; // {label, images[], currentIndex}
 
         let gameState = {
             round: 0, maxRounds: 3, theme: 'flags', bpm: 165,
             offset: 0, interval: 0, introSeconds: 2.4, playbackRate: 1.0, 
             isPaused: false, abortController: null, selectedTheme: 'flags',
             isRecording: false, 
-            activePool: [], // 記憶池 (8個)
+            activePool: [], 
             hintMode: 'first',
+            uniqueCount: 8, 
             history: [] 
         };
 
@@ -467,8 +491,8 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- 1. 搜尋 (LoremFlickr + 多關鍵字) ---
-        function previewSearchImages() {
+        // --- 1. 搜尋 (Wikipedia API + 精準過濾 + 刪除功能) ---
+        async function searchWikiImages() {
             const inputVal = document.getElementById('search-input').value.trim();
             if (!inputVal) return;
 
@@ -479,40 +503,154 @@
             const grid = document.getElementById('preview-grid');
             
             previewArea.style.display = 'block';
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">載入中...</div>';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋中... (過濾無關圖片)</div>';
             tempSearchItems = [];
 
+            // 每個關鍵字準備 slot
+            // 允許關鍵字重複出現 (如果你輸入 "蘋果,蘋果" 就會搜兩次)
+            // 但為了UI呈現，這裡如果關鍵字少於8個，我們會循環補滿
+            let fullKeywords = [];
+            while(fullKeywords.length < 8) {
+                fullKeywords = fullKeywords.concat(keywords);
+            }
+            fullKeywords = fullKeywords.slice(0, 8); // 取前8個
+
             for (let i = 0; i < 8; i++) {
-                const keyword = keywords[i % keywords.length]; // 循環使用關鍵字
-                const url = `https://loremflickr.com/320/320/${encodeURIComponent(keyword)}?lock=${Math.floor(Math.random()*1000)}`;
-                tempSearchItems.push({ url: url, label: keyword });
+                tempSearchItems.push({
+                    label: fullKeywords[i],
+                    images: [],
+                    currentIndex: 0
+                });
             }
 
+            const uniqueKeywords = [...new Set(keywords)];
+            const keywordImageMap = {}; 
+
+            for (let kw of uniqueKeywords) {
+                try {
+                    // Wiki API: generator=images (抓頁面內所有圖) + pageimages (抓縮圖)
+                    const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(kw)}&gsrlimit=1&prop=images|pageimages&imlimit=50&pithumbsize=400&format=json&origin=*`;
+                    
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    keywordImageMap[kw] = [];
+                    
+                    if (data.query && data.query.pages) {
+                        const page = Object.values(data.query.pages)[0];
+                        
+                        // 1. 優先：Page Image (縮圖)
+                        if (page.thumbnail && page.thumbnail.source) {
+                            keywordImageMap[kw].push(page.thumbnail.source);
+                        }
+
+                        // 2. 其次：頁面內的其他圖片 (需二次查詢取得 URL)
+                        if (page.images) {
+                            const imageTitles = page.images.map(img => img.title)
+                                .filter(title => !title.match(/\.(svg|tif|tiff)$/i)) // 過濾向量圖/icon
+                                .filter(title => !title.match(/logo|icon|symbol|stub|flag|map/i)) // 過濾圖標
+                                .slice(0, 20); // 取前20張
+
+                            if (imageTitles.length > 0) {
+                                // 批量查詢圖片網址
+                                const titlesParam = imageTitles.join('|');
+                                const imgUrlApi = `https://zh.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titlesParam)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                                const imgRes = await fetch(imgUrlApi);
+                                const imgData = await imgRes.json();
+                                
+                                if (imgData.query && imgData.query.pages) {
+                                    Object.values(imgData.query.pages).forEach(p => {
+                                        if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].url) {
+                                            keywordImageMap[kw].push(p.imageinfo[0].url);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (keywordImageMap[kw].length === 0) {
+                        keywordImageMap[kw].push(`https://placehold.co/200x200?text=${kw}`);
+                    }
+                } catch(e) { console.error(e); }
+            }
+
+            tempSearchItems.forEach(slot => {
+                if (keywordImageMap[slot.label]) {
+                    slot.images = keywordImageMap[slot.label];
+                }
+            });
+
+            renderPreviewGrid();
+        }
+
+        function renderPreviewGrid() {
+            const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
-            tempSearchItems.forEach(item => {
+            
+            tempSearchItems.forEach((slot, index) => {
+                // 如果該 slot 被標記為刪除，就不渲染
+                if (slot.deleted) return;
+
                 const div = document.createElement('div');
                 div.className = 'preview-item';
+                
+                const currentImg = slot.images[slot.currentIndex % slot.images.length] || 'https://placehold.co/200x200?text=NoImg';
+                
                 div.innerHTML = `
-                    <img src="${item.url}" class="preview-img">
-                    <div class="preview-label">${item.label}</div>
+                    <div class="preview-actions">
+                        <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張">🔄</button>
+                        <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
+                    </div>
+                    <img src="${currentImg}" class="preview-img" id="prev-img-${index}">
+                    <div class="preview-label">${slot.label}</div>
                 `;
                 grid.appendChild(div);
             });
         }
 
-        function confirmSearchTheme() {
-            const keyword = document.getElementById('search-input').value.trim();
-            if (!keyword || tempSearchItems.length === 0) return;
+        function swapPreviewImage(index) {
+            const slot = tempSearchItems[index];
+            if (slot && slot.images.length > 1) {
+                slot.currentIndex++;
+                const newImg = slot.images[slot.currentIndex % slot.images.length];
+                const imgEl = document.getElementById(`prev-img-${index}`);
+                if(imgEl) imgEl.src = newImg;
+            }
+        }
 
-            const themeKey = "search_" + keyword;
-            searchData[themeKey] = [...tempSearchItems]; 
+        function removePreviewImage(index) {
+            if(tempSearchItems[index]) {
+                tempSearchItems[index].deleted = true;
+                // 重新渲染 grid
+                renderPreviewGrid();
+            }
+        }
+
+        function confirmSearchTheme() {
+            // 過濾掉被刪除的
+            const activeItems = tempSearchItems.filter(item => !item.deleted);
+
+            if (activeItems.length === 0) {
+                alert("請至少保留一張圖片！");
+                return;
+            }
+
+            const finalImages = activeItems.map(slot => ({
+                url: slot.images[slot.currentIndex % slot.images.length],
+                label: slot.label
+            }));
+
+            const keyword = document.getElementById('search-input').value.trim().substring(0, 10);
+            const themeKey = "search_" + Date.now();
+            searchData[themeKey] = finalImages;
 
             updateThemeSelect();
             document.getElementById('theme-select').value = themeKey;
             saveSettings();
             
             document.getElementById('preview-area').style.display = 'none'; 
-            document.getElementById('search-status').innerText = `✅ 已套用: ${keyword}`;
+            document.getElementById('search-status').innerText = `✅ 已套用主題 (共${finalImages.length}張)`;
         }
 
         // --- 2. 資料夾 & 音樂 ---
@@ -525,7 +663,6 @@
                 const pathParts = file.webkitRelativePath.split('/');
                 let themeName = (pathParts.length > 1) ? pathParts[pathParts.length - 2] : "自訂相簿";
                 if (!customData[themeName]) customData[themeName] = [];
-                // 自動去副檔名
                 const fileName = file.name.replace(/\.[^/.]+$/, "");
                 customData[themeName].push({ url: URL.createObjectURL(file), label: fileName });
                 count++;
@@ -569,7 +706,7 @@
 
         // --- 3. 錄音 ---
         if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            // HTTPS warning if needed
+            // HTTPS warning
         }
 
         async function startRecording() {
@@ -622,6 +759,7 @@
             localStorage.setItem('rg_rate', document.getElementById('rate-input').value);
             localStorage.setItem('rg_record', document.getElementById('record-toggle').value);
             localStorage.setItem('rg_hint', document.getElementById('hint-mode').value);
+            localStorage.setItem('rg_unique', document.getElementById('unique-count').value);
             
             document.getElementById('bpm-display').innerText = document.getElementById('bpm-input').value;
             document.getElementById('interval-display').innerText = document.getElementById('interval-input').value;
@@ -647,6 +785,7 @@
             }
             if(s.getItem('rg_record')) document.getElementById('record-toggle').value = s.getItem('rg_record');
             if(s.getItem('rg_hint')) document.getElementById('hint-mode').value = s.getItem('rg_hint');
+            if(s.getItem('rg_unique')) document.getElementById('unique-count').value = s.getItem('rg_unique');
         }
 
         function updateThemeSelect() {
@@ -663,7 +802,7 @@
             for (let theme in searchData) {
                 const opt = document.createElement('option');
                 opt.value = theme;
-                opt.innerText = `🔍 ${theme.replace('search_', '')}`;
+                opt.innerText = `🔍 自訂: ${searchData[theme][0].label}...`;
                 searchGroup.appendChild(opt);
             }
             select.appendChild(searchGroup);
@@ -683,8 +822,8 @@
             }
 
             select.innerHTML += `
-                <optgroup label="內建主題 (附答案)">
-                    <option value="flags">🏳️‍🌈 國旗挑戰</option>
+                <optgroup label="內建主題">
+                    <option value="flags">🗺️ 國旗挑戰</option>
                     <option value="math">➗ 數學符號</option>
                     <option value="chinese_phonetic">🀄️ 中文字 (繞口令)</option>
                     <option value="animals">🦁 動物 Emoji</option>
@@ -741,14 +880,14 @@
             });
         }
 
-        // --- 數據池初始化函式 (記憶模式核心) ---
+        // --- 數據池初始化函式 (自動補滿 & 重複處理) ---
         function initActivePool(theme) {
             let pool = [];
             
             if (theme === 'flags') {
-                pool = flagsData.map(f => ({ content: `https://flagcdn.com/h240/${f.c}.png`, label: f.n, theme: 'flags' }));
+                pool = flagsData.map(f => ({ content: `https://flagcdn.com/w640/${f.c}.png`, label: f.n, theme: 'flags' }));
             } else if (theme.startsWith('search_')) {
-                // 這裡要使用儲存的 {url, label} 物件
+                // 使用搜尋結果 (已經是固定好的圖片)
                 pool = searchData[theme].map(item => ({ content: item.url, label: item.label, theme: 'search' }));
             } else if (theme.startsWith('custom_')) {
                 const real = theme.replace('custom_', '');
@@ -777,8 +916,22 @@
                 pool = commonData.animals.map(item => ({ content: item, label: 'Animal', theme: 'animals' }));
             }
 
-            // 洗牌並取前 8 個作為本局固定題庫
-            return pool.sort(() => 0.5 - Math.random()).slice(0, 8);
+            // 防呆補滿
+            if (pool.length > 0 && pool.length < 8) {
+                while (pool.length < 8) {
+                    pool = pool.concat(pool);
+                }
+            }
+
+            // 處理「重複出題數」
+            const uCount = parseInt(gameState.uniqueCount) || 8;
+            const uniqueItems = pool.sort(() => 0.5 - Math.random()).slice(0, uCount);
+            
+            let final8 = [];
+            while(final8.length < 8) {
+                final8 = final8.concat(uniqueItems);
+            }
+            return final8.slice(0, 8);
         }
 
         async function startGame() {
@@ -790,20 +943,19 @@
             gameState.introSeconds = parseFloat(document.getElementById('intro-seconds-input').value) || 0;
             gameState.playbackRate = parseFloat(document.getElementById('rate-input').value) || 1.0;
             gameState.hintMode = document.getElementById('hint-mode').value;
+            gameState.uniqueCount = parseInt(document.getElementById('unique-count').value);
             
             gameState.round = 0;
             gameState.abortController = new AbortController();
             gameState.history = []; 
             window.currentTimers = [];
 
-            // 決定本局主題 & 初始化記憶池
             let finalTheme = gameState.selectedTheme;
             if (finalTheme === 'random_locked') {
                 const allT = getAllThemes().filter(t => !t.startsWith('random'));
                 finalTheme = allT[Math.floor(Math.random() * allT.length)];
             }
             
-            // 如果不是混合/每回隨機，則初始化固定池
             if (finalTheme !== 'random_mixed' && finalTheme !== 'random_round') {
                 gameState.activePool = initActivePool(finalTheme);
             }
@@ -870,7 +1022,6 @@
                     grid.innerHTML = '';
                     let items = [];
 
-                    // 題目產生邏輯
                     if (gameState.currentRunTheme === 'random_mixed') {
                         items = getMixedItems();
                     } else if (gameState.currentRunTheme === 'random_round') {
@@ -878,7 +1029,6 @@
                         const t = allT[Math.floor(Math.random() * allT.length)];
                         items = initActivePool(t);
                     } else {
-                        // 固定主題：從 activePool (8個) 中重新洗牌
                         items = [...gameState.activePool].sort(() => 0.5 - Math.random());
                     }
                     
