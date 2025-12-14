@@ -2,12 +2,13 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>節奏遊戲</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>節奏遊戲 (錄音+搜尋版)</title>
     <style>
         :root {
             --primary-color: #ff4757;
             --secondary-color: #2ed573;
+            --accent-color: #54a0ff;
             --bg-color: #f1f2f6;
             --box-bg: #ffffff;
             --modal-bg: rgba(0, 0, 0, 0.6);
@@ -24,9 +25,10 @@
             margin: 0;
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none;
         }
 
-        /* 通用按鈕樣式 */
+        /* 通用按鈕 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -42,10 +44,21 @@
         }
         .btn-primary:hover { transform: translateY(-2px); }
 
+        .btn-action {
+            background-color: var(--accent-color); color: white; border: none;
+            padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
+            cursor: pointer; width: 100%; margin-top: 5px;
+        }
+
         .btn-upload {
             background-color: var(--secondary-color); color: white; border: none;
             padding: 8px 15px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
             cursor: pointer; width: 100%; margin-top: 5px;
+        }
+
+        .btn-test {
+            background-color: #a4b0be; color: white; border: none; padding: 5px 10px;
+            border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-left: 5px;
         }
 
         /* 主畫面 */
@@ -90,10 +103,12 @@
             padding: 12px; border-radius: 10px;
         }
         .control-group label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-        input[type="range"], input[type="number"] { width: 100%; padding: 5px; }
+        input[type="range"], input[type="number"], input[type="text"] { width: 100%; padding: 5px; box-sizing: border-box; }
+        input[type="text"] { border: 1px solid #ccc; border-radius: 5px; padding: 8px; }
         
         #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all; }
         #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
+        #search-status { font-size: 0.85rem; color: var(--accent-color); margin-top: 5px; font-weight: bold; }
 
         /* 遊戲畫面 */
         #game-screen {
@@ -138,11 +153,18 @@
         }
         #pause-overlay h2 { color: white; font-size: 4rem; margin: 0 0 20px 0; }
 
+        /* 結束畫面 */
         #end-screen {
             display: none; flex-direction: column; align-items: center; gap: 20px;
-            background: white; padding: 40px; border-radius: 20px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            background: white; padding: 30px; border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 85%; max-width: 400px;
         }
+        
+        #audio-player-container {
+            width: 100%; background: #f1f2f6; padding: 15px; border-radius: 10px;
+            text-align: center; display: none; /* 預設隱藏 */
+        }
+        audio { width: 100%; margin-top: 10px; }
 
         .hidden { display: none !important; }
         #folder-input { display: none; }
@@ -157,8 +179,13 @@
         <div class="theme-selector">
             <label style="font-weight:bold; color:#555;">選擇主題</label>
             <select id="theme-select" onchange="saveSettings()">
-                <option value="random">🎲 隨機主題 (每次換)</option>
-                <option value="mixed">🧪 大雜燴 (全部混合)</option>
+                <option value="random_mixed">🧪 大雜燴 (全部混合)</option>
+                <option value="random_round">🎲 隨機 (每回合換)</option>
+                <option value="random_locked">🔒 隨機 (整局鎖定)</option>
+                
+                <optgroup label="🔍 自訂搜尋">
+                    </optgroup>
+
                 <optgroup label="API / 連網主題">
                     <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
                     <option value="robots">🤖 機器人 (RoboHash)</option>
@@ -194,6 +221,15 @@
                 <button class="close-btn" onclick="closeSettingsBtn()">✕</button>
             </div>
 
+            <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
+                <label style="color:#54a0ff;">🔍 搜尋並建立主題</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="search-input" placeholder="輸入關鍵字 (如: Batman)">
+                    <button class="btn-action" style="width:auto; margin:0;" onclick="createSearchTheme()">搜尋</button>
+                </div>
+                <div id="search-status">輸入英文關鍵字效果較好</div>
+            </div>
+
             <div class="control-group" style="border: 2px dashed #2ed573; background: #eafff2;">
                 <label>📂 上傳自訂主題資料夾</label>
                 <input type="file" id="folder-input" webkitdirectory directory multiple>
@@ -204,9 +240,28 @@
             </div>
 
             <div class="control-group">
-                <label>🎵 背景音樂 (支援所有音訊)</label>
-                <input type="file" id="music-file">
-                <div id="file-status">未選擇檔案</div>
+                <label>🎵 背景音樂</label>
+                <div style="margin-bottom: 10px;">
+                    <label style="font-size:0.85rem; color:#666;">1. 上傳檔案 (MP3/WAV):</label>
+                    <input type="file" id="music-file">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color:#666;">2. 或 Google Drive 連結:</label>
+                    <input type="text" id="drive-input" placeholder="https://drive.google.com/..." oninput="handleDriveLink(this.value)">
+                </div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:5px;">
+                    <span id="file-status">未選擇檔案</span>
+                    <button class="btn-test" onclick="testAudio()">🔊 試聽</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🎙️ 遊戲錄音 (結束後回放):</label>
+                <select id="record-toggle" onchange="saveSettings()">
+                    <option value="off">關閉</option>
+                    <option value="on">開啟 (需麥克風權限)</option>
+                </select>
+                <small style="color:#888;">*戴耳機效果最佳，避免錄到背景音樂</small>
             </div>
 
             <div class="control-group">
@@ -226,7 +281,7 @@
 
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
-                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" oninput="saveSettings()">
+                <input type="number" id="intro-seconds-input" value="2.4" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
             </div>
 
             <div class="control-group">
@@ -255,8 +310,16 @@
         <h2>PAUSED</h2>
         <button class="btn-primary" style="width: 200px;" onclick="togglePause()">繼續</button>
     </div>
+
     <div id="end-screen">
         <h1>🎉 挑戰完成！</h1>
+        
+        <div id="audio-player-container">
+            <h3>🎙️ 你的表現回放</h3>
+            <audio id="record-player" controls></audio>
+            <div style="font-size:0.8rem; color:#666; margin-top:5px;">(聽聽看有沒有對在拍子上！)</div>
+        </div>
+
         <div style="display:flex; gap:20px;">
             <button class="icon-btn" onclick="goHome()">🏠</button>
             <button class="btn-primary" onclick="restartGame()">再來一次</button>
@@ -264,6 +327,7 @@
     </div>
 
     <script>
+        // 資料庫
         const commonData = {
             animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
             numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
@@ -289,20 +353,49 @@
             'yu': ['魚','漁','於','餘','娛','愚','雨','與','予','語','羽','玉','育','預','遇','欲','獄','域']
         };
 
-        let customData = {}; 
+        let customData = {}; // 本地資料夾圖片
+        let searchData = {}; // 搜尋的圖片
+
         let gameState = {
             round: 0, maxRounds: 3, theme: 'pokemon', bpm: 165,
             offset: 0, interval: 0, introSeconds: 2.4, playbackRate: 1.0, 
-            isPaused: false, abortController: null, selectedTheme: 'pokemon'
+            isPaused: false, abortController: null, selectedTheme: 'pokemon',
+            isRecording: false, lockedTheme: null
         };
 
         let audioCtx;
         let bgmAudio = new Audio();
+        bgmAudio.preload = "auto"; 
         
-        const DB_NAME = "RhythmGameDB";
-        const DB_STORE = "files";
+        // 錄音相關變數
+        let mediaRecorder;
+        let audioChunks = [];
 
-        // 資料夾
+        // --- 1. 搜尋功能 (Pollinations AI) ---
+        function createSearchTheme() {
+            const keyword = document.getElementById('search-input').value.trim();
+            if (!keyword) return;
+
+            const themeKey = "search_" + keyword;
+            searchData[themeKey] = [];
+
+            // 產生 8 個帶隨機數種的 URL，讓 AI 生成該關鍵字的不同圖片
+            for (let i = 0; i < 8; i++) {
+                // Pollinations URL 格式: https://image.pollinations.ai/prompt/{keyword} {seed}
+                const seed = Math.floor(Math.random() * 1000);
+                // encodeURIComponent 確保中文或空格被正確處理
+                const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword)}%20${seed}?nologo=true`;
+                searchData[themeKey].push(url);
+            }
+
+            updateThemeSelect();
+            // 自動選中剛建立的主題
+            document.getElementById('theme-select').value = themeKey;
+            saveSettings();
+            document.getElementById('search-status').innerText = `✅ 已建立主題: ${keyword}`;
+        }
+
+        // --- 2. 資料夾 & 音樂選取 ---
         document.getElementById('folder-input').addEventListener('change', function(e) {
             const files = e.target.files;
             let count = 0;
@@ -319,63 +412,56 @@
             document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
 
-        // 音樂選取 - 終極相容版邏輯
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            
-            // 1. 立刻建立連結，保證 UI 有反應
-            const url = URL.createObjectURL(file);
-            bgmAudio.src = url;
-            bgmAudio.load();
-            document.getElementById('file-status').innerText = `✅ 準備就緒: ${file.name}`;
-            
-            // 2. 允許重複選取
-            this.value = '';
+            document.getElementById('drive-input').value = "";
+            document.getElementById('file-status').innerText = `⌛ 讀取中...`;
 
-            // 3. 嘗試在背景存檔 (不阻擋流程)
-            saveFileToDB(file).then(() => {
-                console.log("DB Saved");
-            }).catch(err => {
-                console.warn("DB Save Failed (Incognito?):", err);
-                document.getElementById('file-status').innerText += " (僅本次有效)";
-            });
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                bgmAudio.src = evt.target.result;
+                bgmAudio.load();
+                document.getElementById('file-status').innerText = `✅ 本地檔案: ${file.name}`;
+            };
+            reader.onerror = function() { alert("讀取失敗"); };
+            reader.readAsDataURL(file);
+            this.value = ''; 
         });
 
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-                };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e);
-            });
+        function handleDriveLink(url) {
+            if (!url) return;
+            let id = "";
+            const parts = url.match(/[-\w]{25,}/);
+            if (parts) id = parts[0];
+            if (id) {
+                const directUrl = `https://drive.google.com/uc?export=download&id=${id}`;
+                bgmAudio.src = directUrl;
+                bgmAudio.load();
+                document.getElementById('file-status').innerText = `☁️ Drive ID: ${id.substring(0,5)}...`;
+                document.getElementById('music-file').value = "";
+                localStorage.setItem('rg_drive_url', url);
+            }
         }
 
-        async function saveFileToDB(file) {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(DB_STORE, "readwrite");
-                const req = tx.objectStore(DB_STORE).put(file, "bgm");
-                req.onsuccess = () => resolve();
-                req.onerror = (e) => reject(e);
-            });
-        }
-
-        async function loadFileFromDB() {
-            try {
-                const db = await initDB();
-                return new Promise((resolve) => {
-                    const tx = db.transaction(DB_STORE, "readonly");
-                    const req = tx.objectStore(DB_STORE).get("bgm");
-                    req.onsuccess = () => resolve(req.result);
-                    req.onerror = () => resolve(null);
+        function testAudio() {
+            if (!bgmAudio.src) { alert("請先選擇檔案！"); return; }
+            bgmAudio.volume = 1.0;
+            bgmAudio.playbackRate = parseFloat(document.getElementById('rate-input').value);
+            
+            const playPromise = bgmAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    document.getElementById('file-status').innerText += " (播放中)";
+                    setTimeout(() => { bgmAudio.pause(); bgmAudio.currentTime = 0; }, 3000); 
+                })
+                .catch(error => {
+                    alert(`播放失敗 (Error: ${error.name})\n請確認：\n1. 手機未靜音\n2. 檔案非損壞`);
                 });
-            } catch(e) { return null; }
+            }
         }
 
+        // --- 3. UI 控制 ---
         function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
         function closeSettingsBtn() { document.getElementById('settings-modal').style.display = 'none'; }
         function closeSettings(e) { if(e.target.id === 'settings-modal') closeSettingsBtn(); }
@@ -388,6 +474,7 @@
             localStorage.setItem('rg_intro', document.getElementById('intro-seconds-input').value);
             localStorage.setItem('rg_interval', document.getElementById('interval-input').value);
             localStorage.setItem('rg_rate', document.getElementById('rate-input').value);
+            localStorage.setItem('rg_record', document.getElementById('record-toggle').value);
             
             document.getElementById('bpm-display').innerText = document.getElementById('bpm-input').value;
             document.getElementById('interval-display').innerText = document.getElementById('interval-input').value;
@@ -411,15 +498,35 @@
                 document.getElementById('rate-input').value = s.getItem('rg_rate');
                 document.getElementById('rate-display').innerText = s.getItem('rg_rate');
             }
+            if(s.getItem('rg_record')) document.getElementById('record-toggle').value = s.getItem('rg_record');
+            if(s.getItem('rg_drive_url')) {
+                document.getElementById('drive-input').value = s.getItem('rg_drive_url');
+                handleDriveLink(s.getItem('rg_drive_url'));
+            }
         }
 
         function updateThemeSelect() {
             const select = document.getElementById('theme-select');
+            
+            // 保留的固定選項 (隨機系列)
             select.innerHTML = `
-                <option value="random">🎲 隨機主題 (每次換)</option>
-                <option value="mixed">🧪 大雜燴 (全部混合)</option>
+                <option value="random_mixed">🧪 大雜燴 (全部混合)</option>
+                <option value="random_round">🎲 隨機 (每回合換)</option>
+                <option value="random_locked">🔒 隨機 (整局鎖定)</option>
             `;
 
+            // 搜尋結果區 (新)
+            const searchGroup = document.createElement('optgroup');
+            searchGroup.label = "🔍 自訂搜尋結果";
+            for (let theme in searchData) {
+                const opt = document.createElement('option');
+                opt.value = theme;
+                opt.innerText = `🔍 ${theme.replace('search_', '')}`;
+                searchGroup.appendChild(opt);
+            }
+            select.appendChild(searchGroup);
+
+            // 本地資料夾
             if (Object.keys(customData).length > 0) {
                 const group = document.createElement('optgroup');
                 group.label = "📂 本地資料夾";
@@ -434,6 +541,7 @@
                 select.appendChild(group);
             }
 
+            // 靜態選項
             select.innerHTML += `
                 <optgroup label="API / 連網主題">
                     <option value="pokemon">⚡️ 寶可夢 (PokeAPI)</option>
@@ -458,14 +566,43 @@
         window.addEventListener('load', async () => {
             loadSettings();
             updateThemeSelect();
-            const file = await loadFileFromDB();
-            if (file) {
-                bgmAudio.src = URL.createObjectURL(file);
-                bgmAudio.load(); 
-                document.getElementById('file-status').innerText = `✅ 上次檔案: ${file.name}`;
-            }
         });
 
+        // --- 4. 錄音功能 ---
+        async function startRecording() {
+            if (document.getElementById('record-toggle').value !== 'on') return;
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                mediaRecorder.start();
+                gameState.isRecording = true;
+            } catch (err) {
+                console.error("Mic Error:", err);
+                alert("無法啟動麥克風，請確認權限。\n(如果是在 App 內瀏覽器開啟，請改用 Chrome/Safari)");
+                document.getElementById('record-toggle').value = 'off';
+            }
+        }
+
+        function stopRecording() {
+            if (gameState.isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // webm 在 Chrome/Android 支援好
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const player = document.getElementById('record-player');
+                    player.src = audioUrl;
+                    document.getElementById('audio-player-container').style.display = 'block';
+                };
+                gameState.isRecording = false;
+            }
+        }
+
+        // --- 5. 遊戲核心 ---
         class SmartTimer {
             constructor(callback, delay) {
                 this.remaining = delay; this.callback = callback;
@@ -507,11 +644,16 @@
             gameState.playbackRate = parseFloat(document.getElementById('rate-input').value) || 1.0;
             gameState.round = 0;
             gameState.abortController = new AbortController();
+            gameState.lockedTheme = null; // 重置鎖定主題
             window.currentTimers = [];
 
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
-            
+            // 處理「隨機(整局鎖定)」邏輯
+            if (gameState.selectedTheme === 'random_locked') {
+                const allT = getAllThemes().filter(t => !t.startsWith('random')); // 排除隨機選項
+                gameState.lockedTheme = allT[Math.floor(Math.random() * allT.length)];
+            }
+
+            // Audio Unlock
             if (bgmAudio.src) {
                 try {
                     bgmAudio.volume = 0; 
@@ -519,23 +661,31 @@
                     bgmAudio.pause();
                     bgmAudio.currentTime = 0;
                     bgmAudio.volume = 1; 
-                } catch (e) { console.log("Unlock failed", e); }
+                } catch (e) { console.log("Unlock failed"); }
             }
 
             document.getElementById('home-screen').classList.add('hidden');
             document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('audio-player-container').style.display = 'none'; // 隱藏播放器
             document.getElementById('game-screen').style.display = 'flex';
             document.getElementById('total-rounds').innerText = gameState.maxRounds;
+
+            // 啟動錄音
+            startRecording();
 
             runGameLoop();
         }
 
         function getItem(theme) {
+            // 搜尋結果
+            if (theme.startsWith('search_')) {
+                const pool = searchData[theme];
+                if (pool) return pool[Math.floor(Math.random() * pool.length)];
+            }
+            // 本地
             if (theme.startsWith('custom_')) {
                 const real = theme.replace('custom_', '');
-                if (customData[real] && customData[real].length > 0) 
-                    return customData[real][Math.floor(Math.random() * customData[real].length)];
-                return "❓";
+                if (customData[real]) return customData[real][Math.floor(Math.random() * customData[real].length)];
             }
             if (theme === 'pokemon') {
                 const id = Math.floor(Math.random() * 151) + 1;
@@ -557,6 +707,7 @@
         function getAllThemes() {
             let t = ['pokemon', 'robots', 'food', 'math', 'chinese_phonetic', 'animals', 'numbers', 'colors'];
             for (let k in customData) t.push('custom_' + k);
+            for (let k in searchData) t.push(k);
             return t;
         }
 
@@ -570,7 +721,13 @@
                     
                     let curTheme = gameState.selectedTheme;
                     const allT = getAllThemes();
-                    if (gameState.selectedTheme === 'random') curTheme = allT[Math.floor(Math.random() * allT.length)];
+
+                    // 主題選擇邏輯
+                    if (gameState.selectedTheme === 'random_locked') {
+                        curTheme = gameState.lockedTheme; // 使用遊戲開始時鎖定的主題
+                    } else if (gameState.selectedTheme === 'random_round') {
+                        curTheme = allT[Math.floor(Math.random() * allT.length)];
+                    }
 
                     if (bgmAudio.src) {
                         if (gameState.offset < 0) {
@@ -587,12 +744,13 @@
                     grid.innerHTML = '';
                     let items = [];
 
-                    if (gameState.selectedTheme === 'mixed') {
+                    if (gameState.selectedTheme === 'random_mixed') {
                         for(let i=0; i<8; i++) {
                             const rt = allT[Math.floor(Math.random() * allT.length)];
                             items.push({ val: getItem(rt), theme: rt });
                         }
                     } else {
+                        // 單一主題
                         if (curTheme === 'chinese_phonetic') {
                             const keys = Object.keys(chineseGroups);
                             const k = keys[Math.floor(Math.random() * keys.length)];
@@ -601,6 +759,9 @@
                         } else if (curTheme.startsWith('custom_')) {
                             const real = curTheme.replace('custom_', '');
                             const pool = customData[real];
+                            for(let i=0; i<8; i++) items.push({ val: pool[Math.floor(Math.random()*pool.length)], theme: curTheme });
+                        } else if (curTheme.startsWith('search_')) {
+                            const pool = searchData[curTheme];
                             for(let i=0; i<8; i++) items.push({ val: pool[Math.floor(Math.random()*pool.length)], theme: curTheme });
                         } else if (['pokemon','robots'].includes(curTheme)) {
                             for(let i=0; i<8; i++) items.push({ val: getItem(curTheme), theme: curTheme });
@@ -653,6 +814,7 @@
         }
 
         function showEndScreen() {
+            stopRecording(); // 停止錄音
             bgmAudio.pause();
             document.getElementById('game-screen').style.display = 'none';
             document.getElementById('end-screen').style.display = 'flex';
@@ -665,16 +827,21 @@
             const btn = document.getElementById('pause-btn');
             if (gameState.isPaused) {
                 overlay.style.display = 'flex'; btn.innerText = '▶️';
-                bgmAudio.pause(); window.currentTimers.forEach(t => t.pause());
+                bgmAudio.pause(); 
+                if(mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.pause();
+                window.currentTimers.forEach(t => t.pause());
             } else {
                 overlay.style.display = 'none'; btn.innerText = '⏸';
-                bgmAudio.play(); window.currentTimers.forEach(t => t.resume());
+                bgmAudio.play(); 
+                if(mediaRecorder && mediaRecorder.state === 'paused') mediaRecorder.resume();
+                window.currentTimers.forEach(t => t.resume());
             }
         }
 
         function resetLogic() {
             if (gameState.abortController) gameState.abortController.abort();
             bgmAudio.pause(); gameState.isPaused = false;
+            stopRecording();
             document.getElementById('pause-overlay').style.display = 'none';
             document.getElementById('pause-btn').innerText = '⏸';
         }
