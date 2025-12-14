@@ -10,7 +10,6 @@
             --primary-color: #ff4757;
             --secondary-color: #2ed573;
             --accent-color: #54a0ff;
-            --danger-color: #ff6b6b;
             --bg-color: #f1f2f6;
             --box-bg: #ffffff;
             --modal-bg: rgba(0, 0, 0, 0.7);
@@ -30,7 +29,7 @@
             -webkit-user-select: none;
         }
 
-        /* 通用按鈕 */
+        /* 按鈕樣式 */
         .icon-btn {
             background: white; border: 2px solid #ddd; width: 50px; height: 50px;
             border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex;
@@ -63,10 +62,28 @@
             border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-left: 5px;
         }
 
-        /* 預覽區的小按鈕群 (恢復此樣式) */
-        .preview-actions {
-            position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; z-index: 10;
+        /* 預覽區域樣式 */
+        #preview-area {
+            display: none; margin-top: 15px;
+            background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
+        
+        #preview-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px;
+        }
+
+        .preview-item { 
+            position: relative; border: 1px solid #ddd; border-radius: 8px; 
+            overflow: hidden; background: #fff; display: flex; flex-direction: column;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .preview-toolbar {
+            display: flex; justify-content: flex-end; gap: 8px; padding: 6px;
+            background: #f8f9fa; border-bottom: 1px solid #eee;
+        }
+
         .btn-mini {
             color: white; border: none; border-radius: 50%; width: 24px; height: 24px;
             font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -75,6 +92,30 @@
         .btn-swap { background: rgba(84, 160, 255, 0.9); }
         .btn-remove { background: rgba(255, 107, 107, 0.9); }
         .btn-mini:hover { transform: scale(1.1); }
+
+        .preview-img {
+            width: 100%; height: 160px; 
+            object-fit: contain; display: block; background: #fff;
+            padding: 5px; box-sizing: border-box;
+        }
+
+        .preview-edit {
+            display: flex; width: 100%; border-top: 1px solid #eee;
+        }
+        .preview-input {
+            flex: 1; border: none; padding: 8px; font-size: 0.9rem; text-align: center;
+            background: #fff; outline: none; color: #333; font-weight: bold;
+        }
+        .preview-input:focus { background: #f0f8ff; }
+        
+        .preview-btn-search {
+            width: 35px; border: none; background: #eee; cursor: pointer; 
+            font-size: 1rem; display: flex; align-items: center; justify-content: center;
+            border-left: 1px solid #ddd;
+        }
+        .preview-btn-search:hover { background: var(--accent-color); color: white; }
+
+        .preview-controls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
 
         /* 主畫面 */
         #home-screen {
@@ -86,7 +127,6 @@
         
         h1 { font-size: 2.5rem; color: #333; margin-bottom: 5px; }
 
-        /* 設定選單 */
         .theme-selector {
             background: white; padding: 20px; border-radius: 15px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.05); width: 80%;
@@ -104,7 +144,7 @@
         }
         .modal-content {
             background: white; padding: 30px; border-radius: 20px;
-            width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto;
+            width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto;
             position: relative; animation: popUp 0.3s ease;
         }
         @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -126,24 +166,6 @@
         #file-status { color: #2ed573; font-weight: bold; font-size: 0.85rem; margin-top: 5px; word-break: break-all; }
         #upload-status { font-size: 0.85rem; color: #2ed573; margin-top: 5px; }
         #search-status { font-size: 0.85rem; color: var(--accent-color); margin-top: 5px; font-weight: bold; }
-
-        /* 預覽區域 */
-        #preview-area {
-            display: none; margin-top: 10px;
-            background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px;
-        }
-        #preview-grid {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px;
-        }
-        .preview-item { position: relative; border: 1px solid #eee; border-radius: 4px; overflow: hidden; background: #f9f9f9; aspect-ratio: 1; }
-        .preview-img {
-            width: 100%; height: 100%; object-fit: contain; display: block;
-        }
-        .preview-label {
-            position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6);
-            color: white; font-size: 0.6rem; text-align: center; overflow: hidden; white-space: nowrap; padding: 2px 0;
-        }
-        .preview-controls { display: flex; gap: 10px; justify-content: flex-end; }
 
         /* 遊戲畫面 */
         #game-screen {
@@ -251,10 +273,12 @@
     <div id="home-screen">
         <button id="mute-home" class="icon-btn" onclick="toggleMute()" title="靜音">🔊</button>
         <button id="settings-trigger" class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
+        
         <h1>🎵 節奏遊戲</h1>
         <p style="color: #888; font-size: 1rem; margin-top: -10px; font-weight: bold;">
-    Created by weic58 and Google Gemini
-	</p>
+            Created by weic58 and Google Gemini
+        </p>
+        
         <div class="theme-selector">
             <label style="font-weight:bold; color:#555;">選擇主題</label>
             <select id="theme-select" onchange="saveSettings()">
@@ -303,14 +327,21 @@
             </div>
 
             <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
-                <label style="color:#54a0ff;">🔍 維基百科搜尋 (支援換圖/刪除)</label>
+                <label style="color:#54a0ff;">🔍維基百科圖片搜尋</label>
+                
+                <div style="margin-bottom:8px;">
+                    <input type="text" id="custom-theme-title" placeholder="設定主題名稱 (選填，例: 漫威英雄)">
+                </div>
+
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="search-input" placeholder="輸入: 香蕉,蘋果 (以逗號或空格分隔)">
+                    <input type="text" id="search-input" placeholder="輸入: 香蕉 蘋果, 'Iron Man'">
                     <button class="btn-action" onclick="searchWikiImages()">搜尋</button>
                 </div>
                 
                 <div id="preview-area">
-                    <div style="font-size:0.8rem; margin-bottom:5px; color:#555;">預覽 (按🔄換圖, ❌刪除):</div>
+                    <div style="font-size:0.8rem; margin-bottom:5px; color:#555;">
+                        預覽 (可編輯文字/換圖/刪除):
+                    </div>
                     <div id="preview-grid"></div>
                     <div class="preview-controls">
                         <button class="btn-action" style="background:#2ed573;" onclick="confirmSearchTheme()">✅ 確認使用</button>
@@ -384,7 +415,7 @@
             <div class="control-group">
                 <label>⏳ 音樂後等待 (秒):</label>
                 <input type="number" id="intro-seconds-input" value="2.5" step="0.1" placeholder="例如: 2.5" oninput="saveSettings()">
-                <div style="text-align:right; font-weight:bold; color:#555;">0.5倍速請調成5.0/5.5秒(電腦/手機)</div>
+                <div style="text-align:right; font-weight:bold; color:#555;">0.5倍速請調成5秒</div>
             </div>
 
             <div class="control-group">
@@ -436,7 +467,6 @@
 
     <script>
         // --- 1. 資料庫 ---
-        // 國旗 (FlagCDN)
         const flagsData = [
             { c: 'tw', n: '台灣' }, { c: 'jp', n: '日本' }, { c: 'us', n: '美國' }, { c: 'kr', n: '韓國' },
             { c: 'cn', n: '中國' }, { c: 'gb', n: '英國' }, { c: 'fr', n: '法國' }, { c: 'de', n: '德國' },
@@ -477,7 +507,7 @@
 
         let customData = {}; 
         let searchData = {}; 
-        let tempSearchItems = []; // {label, images[], currentIndex}
+        let tempSearchItems = []; 
 
         let gameState = {
             round: 0, maxRounds: 3, theme: 'flags', bpm: 165,
@@ -498,62 +528,112 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- 1. 搜尋 (改回 Wikipedia API - 較精準) ---
+        // --- 1. 搜尋 (智慧模式：單詞自動擴充 vs 多詞精準搜尋) ---
         async function searchWikiImages() {
             const inputVal = document.getElementById('search-input').value.trim();
             if (!inputVal) return;
-
-            // [,，\s] 代表：逗號 OR 全形逗號 OR 任何空白(包含全形空格)
-            // + 代表：如果連續輸入多個空格，視為一個分隔符
-            const keywords = inputVal.split(/[,，\s]+/).map(k => k.trim()).filter(k => k);
-
-            if (keywords.length === 0) return;
 
             const previewArea = document.getElementById('preview-area');
             const grid = document.getElementById('preview-grid');
             
             previewArea.style.display = 'block';
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋維基百科條目中...</div>';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋中...</div>';
             tempSearchItems = [];
 
-            let fullKeywords = [];
-            while(fullKeywords.length < 8) {
-                fullKeywords = fullKeywords.concat(keywords);
-            }
-            fullKeywords = fullKeywords.slice(0, 8); 
-
-            for (let i = 0; i < 8; i++) {
-                tempSearchItems.push({
-                    label: fullKeywords[i],
-                    images: [],
-                    currentIndex: 0
-                });
+            // 1. 切割關鍵字
+            const regex = /"[^"]*"|[^,，\s]+/g;
+            const matches = inputVal.match(regex);
+            
+            if (!matches) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">請輸入關鍵字</div>';
+                return;
             }
 
-            const uniqueKeywords = [...new Set(keywords)];
+            const keywords = matches.map(k => k.replace(/^"|"$/g, '').trim());
+
+            // 2. 分流邏輯
+            if (keywords.length === 1) {
+                // === 模式 A：單一主題擴充 (輸入 "Marvel" -> 找 8 個相關) ===
+                const theme = keywords[0];
+                grid.innerHTML = `<div style="grid-column:1/-1; text-align:center;">正在尋找與「${theme}」相關的項目...</div>`;
+                
+                try {
+                    // 搜尋維基百科相關條目 (抓前 20 個結果來篩選)
+                    const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(theme)}&gsrlimit=20&prop=pageimages&pithumbsize=320&format=json&origin=*`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+
+                    if (data.query && data.query.pages) {
+                        // 將結果轉為陣列
+                        const pages = Object.values(data.query.pages);
+                        
+                        // 過濾出有圖片的條目
+                        const validPages = pages.filter(p => p.thumbnail && p.thumbnail.source);
+
+                        // 取前 8 個 (如果不夠 8 個就全取)
+                        const results = validPages.slice(0, 8);
+
+                        // 建立預覽項目
+                        results.forEach(page => {
+                            // 這裡我們把每個結果都視為一個獨立的 slot
+                            // 為了支援「換圖」，我們把該條目的縮圖當作 images[0]
+                            // (註：主題擴充模式下，暫時不支援單卡換圖，因為它是獨一無二的條目)
+                            tempSearchItems.push({
+                                label: page.title, // 自動使用條目名稱 (如 "蜘蛛人")
+                                images: [page.thumbnail.source],
+                                currentIndex: 0
+                            });
+                        });
+                    }
+                } catch(e) { console.error(e); }
+
+            } else {
+                // === 模式 B：多關鍵字精準搜尋 (維持原樣) ===
+                // 輸入 "Iron Man, Thor" -> 建立兩個 slot
+                for (let i = 0; i < keywords.length; i++) {
+                    tempSearchItems.push({
+                        label: keywords[i],
+                        images: [],
+                        currentIndex: 0
+                    });
+                }
+                // 批量搜尋這些關鍵字
+                await performBatchSearch(keywords);
+            }
+
+            // 3. 渲染結果
+            if (tempSearchItems.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">找不到相關圖片，請換個關鍵字</div>';
+            } else {
+                renderPreviewGrid();
+            }
+        }
+
+        async function performBatchSearch(keywordList) {
+            const uniqueKeywords = [...new Set(keywordList)];
             const keywordImageMap = {}; 
 
             for (let kw of uniqueKeywords) {
                 try {
-                    // 改回 zh.wikipedia.org，抓取條目縮圖 (pageimages)
-                    const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(kw)}&gsrlimit=20&prop=pageimages&pithumbsize=400&format=json&origin=*`;
-                    
+                    // Wiki Commons
+                    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(kw)}%20filetype:bitmap&gsrnamespace=6&gsrlimit=15&prop=imageinfo&iiprop=url&format=json&origin=*`;
                     const res = await fetch(url);
                     const data = await res.json();
                     
                     keywordImageMap[kw] = [];
-                    
                     if (data.query && data.query.pages) {
                         Object.values(data.query.pages).forEach(page => {
-                            // 判斷是否有縮圖
-                            if (page.thumbnail && page.thumbnail.source) {
-                                keywordImageMap[kw].push(page.thumbnail.source);
+                            if (page.imageinfo && page.imageinfo[0] && page.imageinfo[0].url) {
+                                keywordImageMap[kw].push(page.imageinfo[0].url);
                             }
                         });
                     }
                     
+                    // Fallback to AI
                     if (keywordImageMap[kw].length === 0) {
-                        keywordImageMap[kw].push(`https://placehold.co/200x200?text=${kw}`);
+                        const seed = Math.floor(Math.random() * 1000);
+                        const prompt = `photo of ${kw}, realistic, 8k, highly detailed`;
+                        keywordImageMap[kw].push(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&nologo=true`);
                     }
                 } catch(e) { console.error(e); }
             }
@@ -561,10 +641,53 @@
             tempSearchItems.forEach(slot => {
                 if (keywordImageMap[slot.label]) {
                     slot.images = keywordImageMap[slot.label];
+                    slot.currentIndex = 0;
                 }
             });
+        }
 
-            renderPreviewGrid();
+        // 單獨更新某一格
+        async function updateSingleSlot(index) {
+            const inputEl = document.getElementById(`input-${index}`);
+            const newKeyword = inputEl.value.trim();
+            if (!newKeyword) return;
+
+            const imgEl = document.getElementById(`prev-img-${index}`);
+            imgEl.style.opacity = 0.5;
+
+            try {
+                // 先搜 Wiki
+                const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(newKeyword)}%20filetype:bitmap&gsrnamespace=6&gsrlimit=15&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                let newImages = [];
+                if (data.query && data.query.pages) {
+                    Object.values(data.query.pages).forEach(page => {
+                        if (page.imageinfo && page.imageinfo[0] && page.imageinfo[0].url) {
+                            newImages.push(page.imageinfo[0].url);
+                        }
+                    });
+                }
+
+                // AI Fallback
+                if (newImages.length === 0) {
+                    const seed = Math.floor(Math.random() * 1000);
+                    const prompt = `photo of ${newKeyword}, realistic, 8k, highly detailed`;
+                    newImages.push(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&nologo=true`);
+                }
+
+                if (newImages.length > 0) {
+                    tempSearchItems[index].label = newKeyword;
+                    tempSearchItems[index].images = newImages;
+                    tempSearchItems[index].currentIndex = 0;
+                    imgEl.src = newImages[0];
+                }
+            } catch(e) {
+                console.error(e);
+            } finally {
+                imgEl.style.opacity = 1;
+            }
         }
 
         function renderPreviewGrid() {
@@ -580,12 +703,17 @@
                 const currentImg = slot.images[slot.currentIndex % slot.images.length] || 'https://placehold.co/200x200?text=NoImg';
                 
                 div.innerHTML = `
-                    <div class="preview-actions">
+                    <div class="preview-toolbar">
                         <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張">🔄</button>
                         <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
                     </div>
+                    
                     <img src="${currentImg}" class="preview-img" id="prev-img-${index}">
-                    <div class="preview-label">${slot.label}</div>
+                    
+                    <div class="preview-edit">
+                        <input type="text" class="preview-input" value="${slot.label}" id="input-${index}" onkeydown="if(event.key==='Enter') updateSingleSlot(${index})">
+                        <button class="preview-btn-search" onclick="updateSingleSlot(${index})" title="搜尋這個關鍵字">🔎</button>
+                    </div>
                 `;
                 grid.appendChild(div);
             });
@@ -596,7 +724,8 @@
             if (slot && slot.images.length > 1) {
                 slot.currentIndex++;
                 const newImg = slot.images[slot.currentIndex % slot.images.length];
-                document.getElementById(`prev-img-${index}`).src = newImg;
+                const imgEl = document.getElementById(`prev-img-${index}`);
+                if(imgEl) imgEl.src = newImg;
             }
         }
 
@@ -619,16 +748,23 @@
                 label: slot.label
             }));
 
-            const keyword = document.getElementById('search-input').value.trim().substring(0, 10);
+            // 主題名稱 (若沒填寫則用標題)
+            const titleInput = document.getElementById('custom-theme-title').value.trim();
+            const firstKeyword = activeItems[0].label;
+            const themeTitle = titleInput || `🔍 自訂: ${firstKeyword}...`;
+
             const themeKey = "search_" + Date.now();
-            searchData[themeKey] = finalImages;
+            searchData[themeKey] = {
+                images: finalImages,
+                title: themeTitle
+            };
 
             updateThemeSelect();
             document.getElementById('theme-select').value = themeKey;
             saveSettings();
             
             document.getElementById('preview-area').style.display = 'none'; 
-            document.getElementById('search-status').innerText = `✅ 已套用主題 (共${finalImages.length}張)`;
+            document.getElementById('search-status').innerText = `✅ 已套用: ${themeTitle}`;
         }
 
         // --- 2. 資料夾 & 音樂 ---
@@ -789,7 +925,8 @@
             for (let theme in searchData) {
                 const opt = document.createElement('option');
                 opt.value = theme;
-                opt.innerText = `🔍 自訂: ${searchData[theme][0].label}...`;
+                // 優先顯示自訂標題
+                opt.innerText = searchData[theme].title || `🔍 自訂: ${searchData[theme].images[0].label}...`;
                 searchGroup.appendChild(opt);
             }
             select.appendChild(searchGroup);
@@ -867,15 +1004,16 @@
             });
         }
 
-        // --- 數據池初始化 ---
+        // --- 數據池初始化函式 (自動補滿 & 重複處理) ---
         function initActivePool(theme) {
             let pool = [];
             
             if (theme === 'flags') {
                 pool = flagsData.map(f => ({ content: `https://flagcdn.com/w640/${f.c}.png`, label: f.n, theme: 'flags' }));
             } else if (theme.startsWith('search_')) {
-                // 使用搜尋結果
-                pool = searchData[theme].map(item => ({ content: item.url, label: item.label, theme: 'search' }));
+                // 使用搜尋結果 (已經是固定好的圖片)
+                // searchData 現在的結構是 { images: [], title: "" }
+                pool = searchData[theme].images.map(item => ({ content: item.url, label: item.label, theme: 'search' }));
             } else if (theme.startsWith('custom_')) {
                 const real = theme.replace('custom_', '');
                 if (customData[real]) pool = customData[real].map(i => ({ content: i.url, label: i.label, theme: 'custom' }));
@@ -948,7 +1086,7 @@
             }
             gameState.currentRunTheme = finalTheme;
 
-            // 靜音控制
+            // 確保靜音狀態
             bgmAudio.muted = gameState.isMuted;
 
             if (bgmAudio.src) {
@@ -957,7 +1095,7 @@
                     await bgmAudio.play();
                     bgmAudio.pause();
                     bgmAudio.currentTime = 0;
-                    if (!gameState.isMuted) bgmAudio.volume = 1;
+                    if (!gameState.isMuted) bgmAudio.volume = 1; 
                 } catch (e) { console.log("Unlock failed"); }
             }
 
