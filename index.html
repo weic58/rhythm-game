@@ -278,6 +278,25 @@
 
         .hidden { display: none !important; }
         #folder-input { display: none; }
+
+        /* --- 修改列表樣式：支援縮圖顯示 --- */
+        .selection-item {
+            padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;
+            text-align: left; font-size: 0.9rem; color: #333;
+            background: white; margin-bottom: 2px; border-radius: 4px;
+            /* ★ 新增：讓圖文橫向排列 */
+            display: flex; align-items: center; gap: 10px;
+            min-height: 50px; 
+        }
+        .selection-item:hover {
+            background-color: var(--accent-color); color: white;
+        }
+        /* ★ 新增：列表縮圖樣式 */
+        .selection-thumb {
+            width: 50px; height: 50px; border-radius: 4px; 
+            object-fit: cover; background: #eee; flex-shrink: 0;
+            border: 1px solid #ddd;
+        }
     </style>
 </head>
 <body>
@@ -339,22 +358,27 @@
             </div>
 
             <div class="control-group" style="border: 2px solid #54a0ff; background: #f0f8ff;">
-                <label style="color:#54a0ff;">🔍 維基圖庫搜尋 / 自訂編輯</label>
+                <label style="color:#54a0ff;">🔍 關鍵字搜尋 / 自訂編輯</label>
                 
-                <div style="margin-bottom:8px;">
-                    <input type="text" id="custom-theme-title" placeholder="設定主題名稱 (選填)">
+                <div style="margin-bottom:8px; display:flex; gap:5px;">
+                    <select id="search-source" style="width: 40%; font-size: 0.9rem; padding: 5px;">
+                        <option value="wiki">📖 百科條目 (預設)</option>
+                        <option value="commons">🌍 廣泛圖庫 (多元)</option>
+                    </select>
+                    <input type="text" id="custom-theme-title" style="width: 60%;" placeholder="主題名稱 (選填)">
                 </div>
 
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="search-input" placeholder="輸入: 香蕉 蘋果, 'Iron Man'">
-                    <button class="btn-action" onclick="searchWikiImages()">搜尋</button>
-                    </div>
+                    <input type="text" id="search-input" placeholder="例: 貓, 狗, 'Iron Man'">
+                    <button class="btn-action" onclick="searchImages()">搜尋</button>
+                    <button class="btn-action" style="background:#48dbfb;" onclick="editCurrentTheme()">✏️ 修改目前</button>
+                </div>
                 
                 <div id="preview-area">
                     <div class="preview-header-controls">
                         <div style="font-size:0.8rem; color:#555; align-self:center;">預覽編輯區:</div>
                         <div style="display:flex; gap:5px;">
-                            <button class="btn-test" onclick="addPreviewSlot()">➕ 新增一格</button>
+                            <button class="btn-test" onclick="addPreviewSlot()">➕ 加一格</button>
                             <button class="btn-test" style="background:#ff6b6b; color:white;" onclick="clearPreviewSlots()">🗑️ 清除</button>
                         </div>
                     </div>
@@ -546,39 +570,13 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- 1. 搜尋 (優先級：引號 > 逗號 > 空格) ---
-        async function searchWikiImages() {
+        // --- 1. 綜合搜尋 (V8.6: 邏輯判斷 - 單組照條目，多組照輸入) ---
+        async function searchImages() {
             const inputVal = document.getElementById('search-input').value.trim();
             if (!inputVal) return;
 
-            let keywords = [];
-            
-            // 判斷是否有全形或半形逗號
-            const hasComma = /[,，]/.test(inputVal);
-
-            if (hasComma) {
-                // 【模式 A：逗號優先】
-                // 邏輯：有逗號時，空格失效，只認逗號分隔。
-                // 這樣 "Iron Man, Thor" 會被切成 ["Iron Man", "Thor"]
-                
-                // 1. 先用逗號切開
-                let parts = inputVal.split(/[,，]/);
-                
-                // 2. 清理每個部分 (去掉前後空白，去掉多餘引號)
-                keywords = parts.map(k => k.trim().replace(/^"|"$/g, '')).filter(k => k);
-            
-            } else {
-                // 【模式 B：空格優先】(沒有逗號時)
-                // 邏輯：支援 "Iron Man" Hulk -> ["Iron Man", "Hulk"]
-                
-                // 正則：抓取 "雙引號內容" 或 "非空白字串"
-                const regex = /"[^"]*"|[^\s]+/g;
-                const matches = inputVal.match(regex);
-                
-                if (matches) {
-                    keywords = matches.map(k => k.replace(/^"|"$/g, '').trim());
-                }
-            }
+            // 智慧分詞
+            let keywords = inputVal.split(/[,，、]|\s+(?=[\u4e00-\u9fa5])|(?<=[\u4e00-\u9fa5])\s+/).map(k => k.trim()).filter(k => k);
 
             if (keywords.length === 0) return;
 
@@ -586,139 +584,417 @@
             const grid = document.getElementById('preview-grid');
             
             previewArea.style.display = 'block';
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">搜尋中...</div>';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">🔍 智慧搜尋中...</div>';
             tempSearchItems = [];
 
-            // --- 判斷要走「單一主題擴充」還是「指定搜尋」 ---
+            const source = document.getElementById('search-source').value;
 
-            // 如果只有 1 個關鍵字 (例如輸入 "Marvel" 或 "Iron Man")
-            if (keywords.length === 1) {
-                const theme = keywords[0];
-                grid.innerHTML = `<div style="grid-column:1/-1; text-align:center;">正在尋找與「${theme}」相關的項目...</div>`;
+            // ★★★ 判斷是「單組」還是「多組」 ★★★
+            const isSingleSearch = (keywords.length === 1);
+
+            for (let i = 0; i < keywords.length; i++) {
+                // 單組抓12張，多組抓1張
+                const limit = isSingleSearch ? 12 : 1;
                 
-                try {
-                    // 單一主題：搜尋維基百科相關條目 (抓前 20 個結果來篩選 8 個)
-                    const url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(theme)}&gsrlimit=20&prop=pageimages&pithumbsize=320&format=json&origin=*`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-
-                    if (data.query && data.query.pages) {
-                        const pages = Object.values(data.query.pages);
-                        // 過濾有圖的
-                        const validPages = pages.filter(p => p.thumbnail && p.thumbnail.source);
-                        // 取前 8 個
-                        const results = validPages.slice(0, 8);
-
-                        results.forEach(page => {
-                            tempSearchItems.push({
-                                label: page.title,
-                                images: [page.thumbnail.source],
-                                currentIndex: 0
-                            });
-                        });
+                // ★ 將 isSingleSearch 傳入 fetchWikiSmart
+                // true -> 使用 Wiki 條目名 (例如 "Iron Man (film)")
+                // false -> 強制使用 keywords[i] (例如 "Iron Man")
+                const items = await fetchWikiSmart(keywords[i], source, limit, isSingleSearch);
+                
+                if (items.length > 0) {
+                    if(isSingleSearch) {
+                         tempSearchItems = items; 
+                    } else {
+                         tempSearchItems.push(items[0]);
                     }
-                } catch(e) { console.error(e); }
-
-            } else {
-                // 如果有多個關鍵字 (例如 "Iron Man, Thor") -> 進入精準搜尋模式
-                // 1. 根據關鍵字建立 slot (不補滿，有幾個顯示幾個)
-                for (let i = 0; i < keywords.length; i++) {
+                } else {
                     tempSearchItems.push({
                         label: keywords[i],
-                        images: [],
+                        images: [`https://placehold.co/200x200?text=${keywords[i]}`],
                         currentIndex: 0
                     });
                 }
-                // 2. 批量去圖庫抓圖
-                await performBatchSearch(keywords);
             }
 
-            // 渲染
             if (tempSearchItems.length === 0) {
-                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">找不到圖片，請換個關鍵字</div>';
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">找不到圖片</div>';
             } else {
                 renderPreviewGrid();
-            }
-        }
-
-        async function performBatchSearch(keywordList) {
-            const uniqueKeywords = [...new Set(keywordList)];
-            const keywordImageMap = {}; 
-
-            for (let kw of uniqueKeywords) {
-                try {
-                    // Wiki Commons
-                    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(kw)}%20filetype:bitmap&gsrnamespace=6&gsrlimit=15&prop=imageinfo&iiprop=url&format=json&origin=*`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    
-                    keywordImageMap[kw] = [];
-                    if (data.query && data.query.pages) {
-                        Object.values(data.query.pages).forEach(page => {
-                            if (page.imageinfo && page.imageinfo[0] && page.imageinfo[0].url) {
-                                keywordImageMap[kw].push(page.imageinfo[0].url);
-                            }
-                        });
-                    }
-                    
-                    // Fallback to AI
-                    if (keywordImageMap[kw].length === 0) {
-                        const seed = Math.floor(Math.random() * 1000);
-                        const prompt = `photo of ${kw}, realistic, 8k, highly detailed`;
-                        keywordImageMap[kw].push(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&nologo=true`);
-                    }
-                } catch(e) { console.error(e); }
-            }
-
-            tempSearchItems.forEach(slot => {
-                if (keywordImageMap[slot.label]) {
-                    slot.images = keywordImageMap[slot.label];
-                    slot.currentIndex = 0;
+                
+                // 狀態提示
+                const statusDiv = document.getElementById('search-status');
+                if (keywords.length > 1) {
+                    statusDiv.innerText = "✅ 批量模式：名稱已鎖定為您輸入的關鍵字";
+                } else {
+                    statusDiv.innerText = "✅ 單詞模式：名稱顯示為維基百科條目";
                 }
-            });
+            }
         }
 
-        // 單獨更新某一格
+        // --- ★★★ 智慧搜尋 Helper (V8.6: 支援標題模式切換) ★★★ ---
+        async function fetchWikiSmart(keyword, source, limit, useWikiTitle = false) {
+            // 1. 決定搜尋模式
+            const isChinese = /[\u4e00-\u9fa5]/.test(keyword);
+            const baseUrl = (source === 'wiki' && isChinese)
+                ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
+                : (source === 'wiki' ? 'https://en.wikipedia.org/w/api.php' : 'https://commons.wikimedia.org/w/api.php');
+
+            // 搜尋 URL
+            const searchUrl = `${baseUrl}&action=query&generator=search&gsrsearch=${encodeURIComponent(keyword)}&gsrlimit=${limit * 2}&prop=pageimages|info&pithumbsize=500&format=json&origin=*`;
+            
+            // Commons URL
+            const cleanKw = encodeURIComponent(keyword);
+            const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${cleanKw}%20filetype:bitmap%20-icon%20-logo%20-flag%20-map%20-diagram&gsrnamespace=6&gsrlimit=${limit * 2}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+
+            try {
+                const targetUrl = (source === 'commons') ? commonsUrl : searchUrl;
+                const res = await fetch(targetUrl);
+                const data = await res.json();
+                const items = [];
+                const seenUrls = new Set();
+
+                if (data.query && data.query.pages) {
+                    const pages = Object.values(data.query.pages);
+                    // 排序
+                    pages.sort((a, b) => (a.index || 999) - (b.index || 999));
+
+                    for(let page of pages) {
+                        let imgUrl = null;
+                        let title = page.title;
+
+                        // 處理標題 (移除 File: 和副檔名)
+                        if (source !== 'wiki') {
+                            title = title.replace(/^File:/, '').replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                        }
+
+                        // 抓圖邏輯
+                        if (source === 'wiki') {
+                            if (page.thumbnail) imgUrl = page.thumbnail.source;
+                        } else {
+                            if (page.imageinfo && page.imageinfo[0]) imgUrl = page.imageinfo[0].url;
+                        }
+
+                        // 過濾邏輯
+                        if (imgUrl) {
+                            const lowerU = imgUrl.toLowerCase();
+                            if (
+                                !lowerU.endsWith('.svg') && 
+                                !lowerU.includes('icon') && 
+                                !lowerU.includes('ambox') && 
+                                !lowerU.includes('symbol') &&
+                                !seenUrls.has(imgUrl)
+                            ) {
+                                seenUrls.add(imgUrl);
+                                
+                                // ★★★ 關鍵邏輯：決定標題是「條目名」還是「使用者輸入的字」 ★★★
+                                const finalLabel = useWikiTitle ? title : keyword;
+
+                                items.push({
+                                    label: finalLabel,
+                                    images: [imgUrl],
+                                    currentIndex: 0
+                                });
+                            }
+                        }
+                        if (items.length >= limit) break;
+                    }
+                }
+                return items;
+            } catch(e) {
+                console.error(e);
+                return [];
+            }
+        }
+
+        // 通用解析器
+        async function fetchAndParse(url, type) {
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const items = [];
+                const seenUrls = new Set();
+
+                if (data.query && data.query.pages) {
+                    Object.values(data.query.pages).forEach(page => {
+                        let imgUrl = null;
+                        let title = page.title;
+
+                        if (type === 'wiki') {
+                            if (page.thumbnail) imgUrl = page.thumbnail.source;
+                        } else {
+                            if (page.imageinfo && page.imageinfo[0]) imgUrl = page.imageinfo[0].url;
+                            title = title.replace(/^File:/, '').replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                        }
+
+                        // 排除預設的維基百科佔位圖 (有些條目有圖示但不是照片)
+                        if (imgUrl && !imgUrl.includes('Defaut') && !imgUrl.includes('Icon') && !seenUrls.has(imgUrl)) {
+                            seenUrls.add(imgUrl);
+                            items.push({
+                                label: title,
+                                images: [imgUrl],
+                                currentIndex: 0
+                            });
+                        }
+                    });
+                }
+                return items;
+            } catch(e) {
+                console.error(e);
+                return [];
+            }
+        }
+
+        // 幫單一關鍵字找圖 (精準化)
+        async function fetchSpecificKeyword(keyword, source) {
+            try {
+                let url = '';
+                if (source === 'wiki') {
+                    const isChinese = /[\u4e00-\u9fa5]/.test(keyword);
+                    const baseUrl = isChinese 
+                        ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
+                        : 'https://en.wikipedia.org/w/api.php';
+
+                    // ★★★ 改用 prefixsearch ★★★
+                    url = `${baseUrl}&action=query&generator=prefixsearch&gpssearch=${encodeURIComponent(keyword)}&gpslimit=5&prop=pageimages&pithumbsize=400&format=json&origin=*`;
+                } else {
+                    const cleanKw = encodeURIComponent(keyword);
+                    url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${cleanKw}%20filetype:bitmap&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                }
+
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                let foundItem = null;
+
+                if (data.query && data.query.pages) {
+                    const pages = Object.values(data.query.pages);
+                    for (let page of pages) {
+                        let imgUrl = null;
+                        let title = page.title;
+
+                        if (source === 'wiki') {
+                            if (page.thumbnail) imgUrl = page.thumbnail.source;
+                        } else {
+                            if (page.imageinfo && page.imageinfo[0]) imgUrl = page.imageinfo[0].url;
+                            title = title.replace(/^File:/, '').replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                        }
+
+                        if (imgUrl) {
+                            foundItem = {
+                                label: title, 
+                                images: [imgUrl],
+                                currentIndex: 0
+                            };
+                            break;
+                        }
+                    }
+                }
+
+                if (foundItem) {
+                    tempSearchItems.push(foundItem);
+                } else {
+                    tempSearchItems.push({
+                        label: keyword,
+                        images: [`https://placehold.co/200x200?text=${keyword}`],
+                        currentIndex: 0
+                    });
+                }
+
+            } catch(e) { console.error(e); }
+        }
+
+        // --- 2. 單格更新 (V8.7: 列表顯示縮圖 + Proxy 支援) ---
         async function updateSingleSlot(index) {
             const inputEl = document.getElementById(`input-${index}`);
             const newKeyword = inputEl.value.trim();
             if (!newKeyword) return;
+            
+            // 同步輸入框
+            if(tempSearchItems[index]) tempSearchItems[index].label = newKeyword;
 
-            const imgEl = document.getElementById(`prev-img-${index}`);
-            imgEl.style.opacity = 0.5;
+            const source = document.getElementById('search-source').value;
+            const container = document.getElementById(`prev-img-${index}`).parentNode;
+
+            const oldOverlay = container.querySelector('.selection-overlay');
+            if (oldOverlay) oldOverlay.remove();
+
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'selection-overlay';
+            loadingOverlay.innerHTML = '<div style="margin:auto;">🔍 搜尋中...</div>';
+            container.appendChild(loadingOverlay);
+
+            const processData = (data) => {
+                loadingOverlay.innerHTML = '';
+                const closeBtn = document.createElement('div');
+                closeBtn.className = 'selection-close';
+                closeBtn.innerText = '取消 ✕';
+                closeBtn.onclick = () => loadingOverlay.remove();
+                loadingOverlay.appendChild(closeBtn);
+
+                if (data.query && data.query.pages) {
+                    let pages = Object.values(data.query.pages);
+                    pages.sort((a, b) => (a.index || 999) - (b.index || 999));
+
+                    pages.forEach(page => {
+                        // 1. 處理標題
+                        let title = page.title;
+                        if (source !== 'wiki') {
+                            title = title.replace(/^File:/, '').replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                        }
+
+                        // 2. ★★★ 處理縮圖 URL ★★★
+                        let thumbUrl = 'https://placehold.co/100x100?text=NoImg'; // 預設圖
+                        if (source === 'wiki') {
+                            if (page.thumbnail && page.thumbnail.source) {
+                                thumbUrl = page.thumbnail.source;
+                            } else {
+                                thumbUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Text_document_with_red_question_mark.svg/50px-Text_document_with_red_question_mark.svg.png'; // 文件圖示
+                            }
+                        } else {
+                            // Commons
+                            if (page.imageinfo && page.imageinfo[0] && page.imageinfo[0].thumburl) {
+                                thumbUrl = page.imageinfo[0].thumburl;
+                            }
+                        }
+
+                        // 3. 建立項目 (含圖片)
+                        const item = document.createElement('div');
+                        item.className = 'selection-item';
+                        
+                        // 插入 HTML: [圖片] + [文字]
+                        item.innerHTML = `
+                            <img src="${thumbUrl}" class="selection-thumb" onerror="this.src='https://placehold.co/50?text=Err'">
+                            <span style="flex:1;">${title}</span>
+                        `;
+                        
+                        item.onclick = () => {
+                            if (typeof selectWikiEntry === 'function') {
+                                selectWikiEntry(index, page.title, source, loadingOverlay);
+                            }
+                        };
+                        loadingOverlay.appendChild(item);
+                    });
+                } else {
+                    loadingOverlay.innerHTML += `<div style="margin:auto; color:red;">找不到「${newKeyword}」</div>`;
+                }
+            };
+
+            // ★★★ API 參數調整：請求縮圖 (Thumbnail) ★★★
+            let targetUrl = '';
+            if (source === 'wiki') {
+                const isChinese = /[\u4e00-\u9fa5]/.test(newKeyword);
+                const baseUrl = isChinese 
+                    ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
+                    : 'https://en.wikipedia.org/w/api.php';
+                
+                // 加入 pithumbsize=100 (要求100px縮圖)
+                targetUrl = `${baseUrl}&action=query&generator=search&gsrsearch=${encodeURIComponent(newKeyword)}&gsrlimit=10&prop=pageimages|info&pithumbsize=100&format=json&origin=*`;
+            } else {
+                const cleanKw = encodeURIComponent(newKeyword);
+                // 加入 iiurlwidth=100 (Commons要求縮圖)
+                targetUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${cleanKw}%20filetype:bitmap&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url&iiurlwidth=100&format=json&origin=*`;
+            }
 
             try {
-                // 先搜 Wiki
-                const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(newKeyword)}%20filetype:bitmap&gsrnamespace=6&gsrlimit=15&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                const res = await fetch(targetUrl);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                processData(data);
+            } catch(e) {
+                console.warn("直接連線失敗，切換 Proxy...", e);
+                loadingOverlay.innerHTML = '<div style="margin:auto;">⚠️ 嘗試備用線路...</div>';
+                try {
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+                    const resProxy = await fetch(proxyUrl);
+                    if (!resProxy.ok) throw new Error(`Proxy Error`);
+                    const dataProxy = await resProxy.json();
+                    processData(dataProxy);
+                } catch(proxyError) {
+                    loadingOverlay.innerHTML = `<div style="margin:auto; color:red; padding:10px;">連線失敗<br>請檢查網路</div>`;
+                    const errClose = document.createElement('div');
+                    errClose.className = 'selection-close';
+                    errClose.innerText = '關閉';
+                    errClose.onclick = () => loadingOverlay.remove();
+                    loadingOverlay.prepend(errClose);
+                }
+            }
+        }
+
+        // --- 3. 選定條目後：只抓圖，不改名 (修正版) ---
+        async function selectWikiEntry(index, exactTitle, source, overlay) {
+            overlay.innerHTML = '<div style="margin:auto;">正在下載圖片...</div>';
+            const imgEl = document.getElementById(`prev-img-${index}`);
+            const inputEl = document.getElementById(`input-${index}`); // 這就是你目前輸入框裡的字
+
+            try {
+                let url = '';
+                
+                if (source === 'wiki') {
+                     // 為了抓圖，我們還是要用 exactTitle 去問 API
+                     const isChinese = /[\u4e00-\u9fa5]/.test(exactTitle);
+                     const baseUrl = isChinese 
+                        ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
+                        : 'https://en.wikipedia.org/w/api.php';
+                    
+                    url = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&generator=images&gimlimit=20&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                } else {
+                    url = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(exactTitle)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                }
+
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                let newImages = [];
+                let imgUrl = null;
+                
+                // --- 抓圖邏輯 (與之前相同) ---
                 if (data.query && data.query.pages) {
-                    Object.values(data.query.pages).forEach(page => {
-                        if (page.imageinfo && page.imageinfo[0] && page.imageinfo[0].url) {
-                            newImages.push(page.imageinfo[0].url);
+                    const pages = Object.values(data.query.pages);
+                    for (let p of pages) {
+                        if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].url) {
+                            const u = p.imageinfo[0].url;
+                            const lowerU = u.toLowerCase();
+                            if (!lowerU.endsWith('.svg') && !lowerU.includes('icon') && !lowerU.includes('ambox') && !lowerU.includes('padlock')) {
+                                imgUrl = u;
+                                break; 
+                            }
                         }
-                    });
+                    }
+                    if (!imgUrl) {
+                        for (let p of pages) {
+                            if (p.imageinfo && p.imageinfo[0] && !p.imageinfo[0].url.includes('Icon')) { 
+                                imgUrl = p.imageinfo[0].url; break; 
+                            }
+                        }
+                    }
                 }
 
-                // AI Fallback
-                if (newImages.length === 0) {
-                    const seed = Math.floor(Math.random() * 1000);
-                    const prompt = `photo of ${newKeyword}, realistic, 8k, highly detailed`;
-                    newImages.push(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&nologo=true`);
-                }
-
-                if (newImages.length > 0) {
-                    tempSearchItems[index].label = newKeyword;
-                    tempSearchItems[index].images = newImages;
+                if (imgUrl) {
+                    // ★★★ 關鍵修改處 ★★★
+                    
+                    // 1. 設定圖片 URL
+                    tempSearchItems[index].images = [imgUrl]; 
                     tempSearchItems[index].currentIndex = 0;
-                    imgEl.src = newImages[0];
+                    tempSearchItems[index].isAI = false;
+                    imgEl.src = imgUrl;
+
+                    // 2. 設定 Label (題目名稱)
+                    // 原本：會強制用 Wiki 的標題 (exactTitle) 覆蓋
+                    // 修改：保留使用者目前輸入框 (inputEl) 裡的字
+                    tempSearchItems[index].label = inputEl.value; 
+
+                    // 移除這行，不要去改輸入框的值
+                    // inputEl.value = ... (已刪除)
+
+                    overlay.remove(); 
+                } else {
+                    alert(`條目「${exactTitle}」裡找不到適合的圖片。`);
+                    overlay.remove();
                 }
+
             } catch(e) {
                 console.error(e);
-            } finally {
-                imgEl.style.opacity = 1;
+                alert("抓圖失敗");
+                overlay.remove();
             }
         }
 
@@ -771,7 +1047,7 @@
             tempImg.src = newUrl;
         }
 
-        // 4. 更新渲染函式 (加入 AI 按鈕)
+        // --- 修正版 2：渲染介面 (加入即時改名功能) ---
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
@@ -784,6 +1060,8 @@
                 
                 const currentImg = slot.images[slot.currentIndex % slot.images.length] || 'https://placehold.co/200x200?text=NoImg';
                 
+                // ★★★ 關鍵修改：input 加入 oninput 事件 ★★★
+                // 這樣你改了文字，就算不按搜尋，最後送出時也會是你改過的字
                 div.innerHTML = `
                     <div class="preview-toolbar">
                         <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="用關鍵字AI生成">✨</button>
@@ -794,7 +1072,11 @@
                     <img src="${currentImg}" class="preview-img" id="prev-img-${index}">
                     
                     <div class="preview-edit">
-                        <input type="text" class="preview-input" value="${slot.label}" id="input-${index}" onkeydown="if(event.key==='Enter') updateSingleSlot(${index})">
+                        <input type="text" class="preview-input" 
+                            value="${slot.label}" 
+                            id="input-${index}" 
+                            oninput="tempSearchItems[${index}].label = this.value"
+                            onkeydown="if(event.key==='Enter') updateSingleSlot(${index})">
                         <button class="preview-btn-search" onclick="updateSingleSlot(${index})" title="搜尋維基">🔎</button>
                     </div>
                 `;
@@ -819,6 +1101,40 @@
             }
         }
 
+        // --- 3. 新增：修改目前已選的主題 ---
+        function editCurrentTheme() {
+            const select = document.getElementById('theme-select');
+            const currentKey = select.value;
+
+            // 檢查是否為自訂搜尋主題 (key 開頭是 search_)
+            if (!currentKey.startsWith('search_') || !searchData[currentKey]) {
+                alert("目前選擇的不是「自訂搜尋主題」，無法修改。\n(內建主題或資料夾無法在此編輯)");
+                return;
+            }
+
+            const data = searchData[currentKey];
+            
+            // 1. 還原標題輸入框
+            document.getElementById('custom-theme-title').value = data.title;
+            
+            // 2. 還原暫存陣列 tempSearchItems
+            // 我們需要把儲存的格式 (url, label) 轉回編輯格式
+            tempSearchItems = data.images.map(img => ({
+                label: img.label,
+                images: [img.content || img.url], // 相容舊格式
+                currentIndex: 0,
+                deleted: false
+            }));
+
+            // 3. 顯示預覽區並渲染
+            document.getElementById('preview-area').style.display = 'block';
+            renderPreviewGrid();
+            
+            // 4. 提示
+            document.getElementById('search-status').innerText = `✏️ 正在編輯: ${data.title}`;
+        }
+
+        // --- 修正版 4：確認套用 (支援覆蓋舊檔) ---
         function confirmSearchTheme() {
             const activeItems = tempSearchItems.filter(item => !item.deleted);
             if (activeItems.length === 0) {
@@ -826,17 +1142,33 @@
                 return;
             }
 
-            const finalImages = activeItems.map(slot => ({
-                url: slot.images[slot.currentIndex % slot.images.length],
-                label: slot.label
-            }));
+            // 最後同步一次輸入框
+            const finalImages = activeItems.map((slot, idx) => {
+                // 嘗試抓取 DOM 上的最新值 (如果有的話)
+                const input = document.getElementById(`input-${idx}`); // 注意：這裡的 idx 可能跟 DOM id 對不上，因為有刪除
+                // 比較保險的做法是直接信賴 tempSearchItems，因為 oninput 已經處理了
+                return {
+                    url: slot.images[slot.currentIndex % slot.images.length],
+                    label: slot.label
+                };
+            });
 
-            // 主題名稱 (若沒填寫則用標題)
             const titleInput = document.getElementById('custom-theme-title').value.trim();
             const firstKeyword = activeItems[0].label;
             const themeTitle = titleInput || `🔍 自訂: ${firstKeyword}...`;
 
-            const themeKey = "search_" + Date.now();
+            // ★ 判斷是「新增」還是「修改」
+            // 如果目前選單已經選在一個 search_ 開頭的主題，且正在編輯它，我們就覆蓋它
+            let themeKey = "search_" + Date.now(); // 預設產生新的 Key
+            
+            const currentSelect = document.getElementById('theme-select').value;
+            // 如果現在是在編輯模式 (預覽區有東西)，且下拉選單選的是既有的 search_
+            if (currentSelect.startsWith('search_') && searchData[currentSelect]) {
+                 // 詢問使用者要覆蓋還是另存
+                 // 為了簡單，這裡我們直接覆蓋 (如果你希望另存，就把這行拿掉)
+                 themeKey = currentSelect;
+            }
+
             searchData[themeKey] = {
                 images: finalImages,
                 title: themeTitle
@@ -847,7 +1179,7 @@
             saveSettings();
             
             document.getElementById('preview-area').style.display = 'none'; 
-            document.getElementById('search-status').innerText = `✅ 已套用: ${themeTitle}`;
+            document.getElementById('search-status').innerText = `✅ 已儲存: ${themeTitle}`;
         }
 
         // --- 2. 資料夾 & 音樂 ---
