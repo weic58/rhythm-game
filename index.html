@@ -413,10 +413,15 @@
                     <input type="text" id="custom-theme-title" style="width: 60%;" placeholder="主題名稱 (選填)">
                 </div>
 
+                <div style="display:flex; gap:5px; margin-bottom: 8px;">
+                    <input type="text" id="search-input" style="flex:1;" placeholder="例: 貓, 狗, 'Iron Man'">
+                    <button class="btn-action" onclick="searchImages()" style="min-width: 60px;">🔍 搜尋</button>
+                </div>
+
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="search-input" placeholder="例: 貓, 狗, 'Iron Man'">
-                    <button class="btn-action" onclick="searchImages()">搜尋</button>
-                    <button class="btn-action" style="background:#48dbfb;" onclick="editCurrentTheme()">✏️ 修改目前</button>
+                    <button class="btn-action" style="background:#48dbfb; flex:1;" onclick="editCurrentTheme()" title="修改目前預覽內容">✏️ 修改</button>
+                    <button class="btn-action" style="background:#ff9f43; flex:1;" onclick="manualSaveData()" title="將目前主題永久存檔">💾 存檔</button>
+                    <button class="btn-action" style="background:#ff7675; flex:1;" onclick="deleteCustomTheme()" title="刪除選取的主題">🗑️ 刪除</button>
                 </div>
                 
                 <div id="preview-area">
@@ -699,20 +704,18 @@
             }
         }
 
-        // --- ★★★ 智慧搜尋 Helper (V8.6: 支援標題模式切換) ★★★ ---
+        // --- ★★★ 智慧搜尋 Helper (V9: 支援多圖庫存 + 封面圖優先) ★★★ ---
         async function fetchWikiSmart(keyword, source, limit, useWikiTitle = false) {
-            // 1. 決定搜尋模式
             const isChinese = /[\u4e00-\u9fa5]/.test(keyword);
             const baseUrl = (source === 'wiki' && isChinese)
                 ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
                 : (source === 'wiki' ? 'https://en.wikipedia.org/w/api.php' : 'https://commons.wikimedia.org/w/api.php');
 
-            // 搜尋 URL
-            const searchUrl = `${baseUrl}&action=query&generator=search&gsrsearch=${encodeURIComponent(keyword)}&gsrlimit=${limit * 2}&prop=pageimages|info&pithumbsize=500&format=json&origin=*`;
+            // 調整策略：我們需要抓取「封面圖 (PageImages)」而非頁內圖，因為這樣跟搜尋列表最一致，且適合「換一張」
+            const searchUrl = `${baseUrl}&action=query&generator=search&gsrsearch=${encodeURIComponent(keyword)}&gsrlimit=${limit * 5}&prop=pageimages|info&pithumbsize=600&format=json&origin=*`;
             
-            // Commons URL
             const cleanKw = encodeURIComponent(keyword);
-            const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${cleanKw}%20filetype:bitmap%20-icon%20-logo%20-flag%20-map%20-diagram&gsrnamespace=6&gsrlimit=${limit * 2}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+            const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${cleanKw}%20filetype:bitmap%20-icon%20-logo%20-flag%20-map%20-diagram&gsrnamespace=6&gsrlimit=${limit * 5}&prop=imageinfo&iiprop=url&format=json&origin=*`;
 
             try {
                 const targetUrl = (source === 'commons') ? commonsUrl : searchUrl;
@@ -721,53 +724,62 @@
                 const items = [];
                 const seenUrls = new Set();
 
+                // 暫存池：如果是多關鍵字模式，我們要收集多張圖給同一個 Item
+                let collectedImages = [];
+
                 if (data.query && data.query.pages) {
                     const pages = Object.values(data.query.pages);
-                    // 排序
                     pages.sort((a, b) => (a.index || 999) - (b.index || 999));
 
                     for(let page of pages) {
                         let imgUrl = null;
                         let title = page.title;
 
-                        // 處理標題 (移除 File: 和副檔名)
                         if (source !== 'wiki') {
                             title = title.replace(/^File:/, '').replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
                         }
 
-                        // 抓圖邏輯
                         if (source === 'wiki') {
                             if (page.thumbnail) imgUrl = page.thumbnail.source;
                         } else {
                             if (page.imageinfo && page.imageinfo[0]) imgUrl = page.imageinfo[0].url;
                         }
 
-                        // 過濾邏輯
+                        // 過濾
                         if (imgUrl) {
                             const lowerU = imgUrl.toLowerCase();
-                            if (
-                                !lowerU.endsWith('.svg') && 
-                                !lowerU.includes('icon') && 
-                                !lowerU.includes('ambox') && 
-                                !lowerU.includes('symbol') &&
-                                !seenUrls.has(imgUrl)
-                            ) {
+                            if (!lowerU.endsWith('.svg') && !lowerU.includes('icon') && !seenUrls.has(imgUrl)) {
                                 seenUrls.add(imgUrl);
-                                
-                                // ★★★ 關鍵邏輯：決定標題是「條目名」還是「使用者輸入的字」 ★★★
-                                const finalLabel = useWikiTitle ? title : keyword;
+                                collectedImages.push(imgUrl);
 
-                                items.push({
-                                    label: finalLabel,
-                                    images: [imgUrl],
-                                    currentIndex: 0
-                                });
+                                // 如果是「單關鍵字搜尋」(limit > 1)，我們要產出多個不同的 Item
+                                if (limit > 1) {
+                                    const finalLabel = useWikiTitle ? title : keyword;
+                                    items.push({
+                                        label: finalLabel,
+                                        images: [imgUrl], // 這裡暫時只放一張，之後換圖需靠單格搜尋
+                                        currentIndex: 0
+                                    });
+                                }
                             }
                         }
-                        if (items.length >= limit) break;
+                    }
+
+                    // ★★★ 關鍵修改：如果是「多關鍵字搜尋」(limit == 1)，把收集到的圖都塞給它 ★★★
+                    if (limit === 1 && collectedImages.length > 0) {
+                        items.push({
+                            label: keyword,
+                            images: collectedImages, // 這裡會有 [圖1, 圖2, 圖3...]，所以換一張有用！
+                            currentIndex: 0
+                        });
                     }
                 }
+                
+                // 如果是單關鍵字模式，只回傳前 N 個
+                if (limit > 1) return items.slice(0, limit);
+                // 如果是多關鍵字模式，回傳這一個整合好的 Item
                 return items;
+
             } catch(e) {
                 console.error(e);
                 return [];
@@ -988,70 +1000,98 @@
             }
         }
 
-        // --- 3. 選定條目後：只抓圖，不改名 (修正版) ---
+        // --- 3. 選定條目後：封面圖優先 + Proxy 連線救援 (修正抓圖失敗問題) ---
         async function selectWikiEntry(index, exactTitle, source, overlay) {
             overlay.innerHTML = '<div style="margin:auto;">正在下載圖片...</div>';
+            
             const imgEl = document.getElementById(`prev-img-${index}`);
-            const inputEl = document.getElementById(`input-${index}`); // 這就是你目前輸入框裡的字
+            const inputEl = document.getElementById(`input-${index}`); 
+
+            // 定義內部請求函式 (含 Proxy 救援)
+            const fetchWithProxy = async (targetUrl) => {
+                try {
+                    const res = await fetch(targetUrl);
+                    if (!res.ok) throw new Error("Direct fetch failed");
+                    return await res.json();
+                } catch (e) {
+                    console.warn("直接連線失敗，切換 Proxy...", e);
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+                    const resProxy = await fetch(proxyUrl);
+                    return await resProxy.json();
+                }
+            };
 
             try {
-                let url = '';
-                
+                let imgUrl = null;
+                let otherImages = [];
+
+                const isChinese = /[\u4e00-\u9fa5]/.test(exactTitle);
+                const baseUrl = (source === 'wiki' && isChinese)
+                    ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
+                    : (source === 'wiki' ? 'https://en.wikipedia.org/w/api.php' : 'https://commons.wikimedia.org/w/api.php');
+
+                // 步驟 A: 先抓「封面圖」 (與列表縮圖一致)
                 if (source === 'wiki') {
-                     // 為了抓圖，我們還是要用 exactTitle 去問 API
-                     const isChinese = /[\u4e00-\u9fa5]/.test(exactTitle);
-                     const baseUrl = isChinese 
-                        ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
-                        : 'https://en.wikipedia.org/w/api.php';
-                    
-                    url = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&generator=images&gimlimit=20&prop=imageinfo&iiprop=url&format=json&origin=*`;
-                } else {
-                    url = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(exactTitle)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                    const coverUrl = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&prop=pageimages&pithumbsize=600&format=json&origin=*`;
+                    const dataCover = await fetchWithProxy(coverUrl); // 使用救援函式
+                    if (dataCover.query && dataCover.query.pages) {
+                        const p = Object.values(dataCover.query.pages)[0];
+                        if (p.thumbnail) imgUrl = p.thumbnail.source;
+                    }
                 }
 
-                const res = await fetch(url);
-                const data = await res.json();
+                // 步驟 B: 抓「頁內其他圖片」 (作為換一張的備選)
+                // 如果是 Commons，直接抓 imageinfo
+                let imagesUrl = '';
+                if (source === 'wiki') {
+                    imagesUrl = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&generator=images&gimlimit=10&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                } else {
+                    // Commons 直接抓本體
+                    imagesUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(exactTitle)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                }
+
+                const dataImages = await fetchWithProxy(imagesUrl); // 使用救援函式
                 
-                let imgUrl = null;
-                
-                // --- 抓圖邏輯 (與之前相同) ---
-                if (data.query && data.query.pages) {
-                    const pages = Object.values(data.query.pages);
+                if (dataImages.query && dataImages.query.pages) {
+                    const pages = Object.values(dataImages.query.pages);
                     for (let p of pages) {
                         if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].url) {
                             const u = p.imageinfo[0].url;
                             const lowerU = u.toLowerCase();
-                            if (!lowerU.endsWith('.svg') && !lowerU.includes('icon') && !lowerU.includes('ambox') && !lowerU.includes('padlock')) {
-                                imgUrl = u;
-                                break; 
-                            }
-                        }
-                    }
-                    if (!imgUrl) {
-                        for (let p of pages) {
-                            if (p.imageinfo && p.imageinfo[0] && !p.imageinfo[0].url.includes('Icon')) { 
-                                imgUrl = p.imageinfo[0].url; break; 
+                            // 過濾雜訊 (排除 svg, icon 等)
+                            if (!lowerU.endsWith('.svg') && !lowerU.includes('icon') && !lowerU.includes('ambox') && u !== imgUrl) {
+                                otherImages.push(u);
                             }
                         }
                     }
                 }
 
-                if (imgUrl) {
-                    // ★★★ 關鍵修改處 ★★★
-                    
-                    // 1. 設定圖片 URL
-                    tempSearchItems[index].images = [imgUrl]; 
+                // 整合：封面圖排第一
+                let finalImages = [];
+                if (imgUrl) finalImages.push(imgUrl);
+                // 如果 Commons 沒抓到封面 (通常 Commons 只有單張圖)，就用 imageinfo 的圖
+                if (!imgUrl && otherImages.length > 0) finalImages.push(otherImages[0]);
+                else if (imgUrl && otherImages.length > 0) finalImages = [...finalImages, ...otherImages];
+                else if (!imgUrl && otherImages.length === 0) {
+                     // 真的完全沒圖
+                } else {
+                     // 只有封面圖
+                     finalImages = [imgUrl];
+                }
+
+                // 去除重複
+                finalImages = [...new Set(finalImages)];
+
+                if (finalImages.length > 0) {
+                    // 更新數據
+                    tempSearchItems[index].images = finalImages; 
                     tempSearchItems[index].currentIndex = 0;
                     tempSearchItems[index].isAI = false;
-                    imgEl.src = imgUrl;
 
-                    // 2. 設定 Label (題目名稱)
-                    // 原本：會強制用 Wiki 的標題 (exactTitle) 覆蓋
-                    // 修改：保留使用者目前輸入框 (inputEl) 裡的字
+                    // 更新畫面
+                    imgEl.src = finalImages[0];
+                    // 鎖定文字為輸入框的值
                     tempSearchItems[index].label = inputEl.value; 
-
-                    // 移除這行，不要去改輸入框的值
-                    // inputEl.value = ... (已刪除)
 
                     overlay.remove(); 
                 } else {
@@ -1061,8 +1101,83 @@
 
             } catch(e) {
                 console.error(e);
-                alert("抓圖失敗");
+                alert("抓圖失敗 (請檢查網路或 AdBlock)");
                 overlay.remove();
+            }
+        }
+
+        // --- 8. 系統存檔與管理員功能 (新功能) ---
+
+        // 儲存自訂主題到瀏覽器
+        function saveSearchData() {
+            try {
+                localStorage.setItem('rg_search_data_v2', JSON.stringify(searchData));
+            } catch(e) {
+                console.error("存檔失敗 (可能容量不足)", e);
+            }
+        }
+
+        // 讀取存檔
+        function loadSearchData() {
+            const saved = localStorage.getItem('rg_search_data_v2');
+            if (saved) {
+                try {
+                    searchData = JSON.parse(saved);
+                    updateThemeSelect(); // 更新下拉選單
+                } catch(e) {
+                    console.error("讀取存檔失敗");
+                }
+            }
+        }
+
+        // 管理員模式：刪除自訂主題
+        function deleteCustomTheme() {
+            const select = document.getElementById('theme-select');
+            const currentKey = select.value;
+
+            // 1. 檢查是否選中自訂主題
+            if (!currentKey.startsWith('search_') || !searchData[currentKey]) {
+                alert("請先選擇一個「自訂搜尋主題」！\n(內建主題無法刪除)");
+                return;
+            }
+
+            // 2. 密碼驗證 (簡單防護)
+            const password = prompt("🔒 請輸入管理員密碼以刪除此主題：", "");
+            if (password !== "8888") { // 你可以把 1234 改成你想要的密碼
+                alert("密碼錯誤！");
+                return;
+            }
+
+            // 3. 執行刪除
+            if (confirm(`確定要永久刪除「${searchData[currentKey].title}」嗎？`)) {
+                delete searchData[currentKey]; // 從記憶體刪除
+                saveSearchData(); // 更新存檔
+                updateThemeSelect(); // 更新選單
+                
+                // 切換回預設值
+                select.value = "flags";
+                saveSettings(); // 儲存目前的選擇
+                alert("✅ 主題已刪除");
+            }
+        }
+
+        // --- 9. 管理員手動存檔 (權限控制) ---
+        function manualSaveData() {
+            // 1. 檢查是否有東西可以存
+            if (Object.keys(searchData).length === 0) {
+                alert("目前沒有任何自訂主題可以儲存。");
+                return;
+            }
+
+            // 2. 密碼驗證
+            const password = prompt("🔒【管理員模式】\n請輸入密碼以將目前所有自訂主題「永久存檔」：", "");
+            
+            if (password === "8888") { // 預設密碼 1234
+                saveSearchData(); // 呼叫真正的寫入函式
+                alert("✅ 存檔成功！\n即使關閉瀏覽器，這些主題也會保留。");
+                document.getElementById('search-status').innerText = "✅ 系統已存檔";
+            } else {
+                if(password !== null) alert("⛔ 密碼錯誤，取消存檔。");
             }
         }
 
@@ -1202,7 +1317,7 @@
             document.getElementById('search-status').innerText = `✏️ 正在編輯: ${data.title}`;
         }
 
-        // --- 修正版 4：確認套用 (支援覆蓋舊檔) ---
+        // --- 修正版 5：確認套用 (只暫存，不自動寫入硬碟) ---
         function confirmSearchTheme() {
             const activeItems = tempSearchItems.filter(item => !item.deleted);
             if (activeItems.length === 0) {
@@ -1210,11 +1325,8 @@
                 return;
             }
 
-            // 最後同步一次輸入框
+            // 同步輸入框
             const finalImages = activeItems.map((slot, idx) => {
-                // 嘗試抓取 DOM 上的最新值 (如果有的話)
-                const input = document.getElementById(`input-${idx}`); // 注意：這裡的 idx 可能跟 DOM id 對不上，因為有刪除
-                // 比較保險的做法是直接信賴 tempSearchItems，因為 oninput 已經處理了
                 return {
                     url: slot.images[slot.currentIndex % slot.images.length],
                     label: slot.label
@@ -1225,18 +1337,14 @@
             const firstKeyword = activeItems[0].label;
             const themeTitle = titleInput || `🔍 自訂: ${firstKeyword}...`;
 
-            // ★ 判斷是「新增」還是「修改」
-            // 如果目前選單已經選在一個 search_ 開頭的主題，且正在編輯它，我們就覆蓋它
-            let themeKey = "search_" + Date.now(); // 預設產生新的 Key
-            
+            // 判斷是新增還是覆蓋
+            let themeKey = "search_" + Date.now();
             const currentSelect = document.getElementById('theme-select').value;
-            // 如果現在是在編輯模式 (預覽區有東西)，且下拉選單選的是既有的 search_
             if (currentSelect.startsWith('search_') && searchData[currentSelect]) {
-                 // 詢問使用者要覆蓋還是另存
-                 // 為了簡單，這裡我們直接覆蓋 (如果你希望另存，就把這行拿掉)
                  themeKey = currentSelect;
             }
 
+            // 更新記憶體中的資料
             searchData[themeKey] = {
                 images: finalImages,
                 title: themeTitle
@@ -1244,10 +1352,13 @@
 
             updateThemeSelect();
             document.getElementById('theme-select').value = themeKey;
-            saveSettings();
+            
+            // ★★★ 注意：這裡移除了 saveSearchData(); ★★★
+            // 現在這裡只是「暫存」，重新整理後會消失，除非你手動按存檔
+            saveSettings(); 
             
             document.getElementById('preview-area').style.display = 'none'; 
-            document.getElementById('search-status').innerText = `✅ 已儲存: ${themeTitle}`;
+            document.getElementById('search-status').innerText = `✅ 已暫存: ${themeTitle} (未永久儲存)`;
         }
 
         // --- 2. 資料夾 & 音樂 ---
@@ -1607,8 +1718,8 @@
         }
 
         window.addEventListener('load', async () => {
+            loadSearchData(); // ★ 加入這行：讀取自訂主題
             loadSettings();
-            // 在 loadSettings(); 下面一行加入：
             applyBackground();
             updateThemeSelect();
         });
