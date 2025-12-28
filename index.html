@@ -1245,7 +1245,7 @@
             tempImg.src = newUrl;
         }
 
-        // --- 修正版 3：渲染介面 (加入裁切按鈕) ---
+        // --- 修正版：預覽介面 (按鈕改為只傳 index) ---
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
@@ -1260,10 +1260,9 @@
                 
                 div.innerHTML = `
                     <div class="preview-toolbar">
-                        <button class="btn-mini btn-crop" onclick="cropPreviewImage(${index})" title="裁切這張圖">✂️</button>
+                        <button class="btn-mini btn-crop" onclick="prepareCrop(${index})" title="裁切" style="background:orange;">✂️</button>
                         
-                        <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="用關鍵字AI生成">✨</button>
-                        <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張(維基)">🔄</button>
+                        <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張">🔄</button>
                         <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
                     </div>
                     
@@ -1275,7 +1274,7 @@
                             id="input-${index}" 
                             oninput="tempSearchItems[${index}].label = this.value"
                             onkeydown="if(event.key==='Enter') updateSingleSlot(${index})">
-                        <button class="preview-btn-search" onclick="updateSingleSlot(${index})" title="搜尋維基">🔎</button>
+                        <button class="preview-btn-search" onclick="updateSingleSlot(${index})" title="搜尋">🔎</button>
                     </div>
                 `;
                 grid.appendChild(div);
@@ -1610,6 +1609,15 @@
             document.getElementById('cropper-modal').style.display = 'none';
         }
 
+        // --- 新增：裁切準備函式 ---
+        function prepareCrop(index) {
+            const slot = tempSearchItems[index];
+            if (!slot || slot.images.length === 0) return;
+            // 從記憶體拿網址，絕對安全
+            const url = slot.images[slot.currentIndex % slot.images.length];
+            startCropperForWiki(url, index);
+        }
+
         // --- 14. 手動觸發裁切 (新按鈕功能) ---
         function cropPreviewImage(index) {
             const slot = tempSearchItems[index];
@@ -1622,37 +1630,54 @@
             startCropperForWiki(currentImgUrl, index);
         }
 
-        // --- 修復版：裁切啟動器 (強制 Proxy 下載模式) ---
+        // --- 終極修正版：強力裁切啟動器 ---
         async function startCropperForWiki(imgUrl, index) {
             const statusDiv = document.getElementById('search-status');
             statusDiv.innerText = "⏳ 正在下載圖片...";
             
-            try {
-                let objectUrl = imgUrl;
+            // 強制轉為 HTTPS (GitHub Pages 必要)
+            if (imgUrl.startsWith('http:')) {
+                imgUrl = imgUrl.replace('http:', 'https:');
+            }
 
-                // ★ 強制下載：只要是網路網址，全部走 Proxy 下載成 Blob
-                // 這能解決 99% 的「本機開啟無法裁切」問題
-                if (imgUrl.startsWith('http')) {
-                    // 加一個時間戳記 t=... 防止快取問題
-                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}&t=${Date.now()}`;
-                    
-                    const res = await fetch(proxyUrl);
-                    if(!res.ok) throw new Error("Proxy download failed");
-                    
-                    const blob = await res.blob();
-                    objectUrl = URL.createObjectURL(blob);
+            // 下載小幫手
+            const tryFetch = async (url) => {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Fetch failed");
+                return await res.blob();
+            };
+
+            try {
+                let blob = null;
+
+                // 1. 優先嘗試：直連 (維基百科通常支援)
+                try {
+                    console.log("嘗試直連...");
+                    blob = await tryFetch(imgUrl);
+                } catch (e1) {
+                    // 2. 失敗嘗試：Proxy A (AllOrigins)
+                    try {
+                        console.warn("直連失敗，嘗試 Proxy A...");
+                        statusDiv.innerText = "⏳ 轉接線路 A...";
+                        const proxyA = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}`;
+                        blob = await tryFetch(proxyA);
+                    } catch (e2) {
+                        // 3. 失敗嘗試：Proxy B (CorsProxy)
+                        console.warn("Proxy A 失敗，嘗試 Proxy B...");
+                        statusDiv.innerText = "⏳ 轉接線路 B...";
+                        const proxyB = `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`;
+                        blob = await tryFetch(proxyB);
+                    }
                 }
 
-                // 設定裁切目標
+                // 成功取得檔案！
+                const objectUrl = URL.createObjectURL(blob);
+
                 cropTargetType = 'card';
                 cropTargetIndex = index;
 
-                // 載入圖片到裁切器
                 const img = document.getElementById('cropper-img');
-                // 清除舊的事件監聽，防止干擾
                 img.onload = null;
-                img.onerror = null;
-                
                 img.src = objectUrl;
                 
                 img.onload = () => {
@@ -1663,16 +1688,15 @@
                 };
 
                 img.onerror = () => {
-                    alert("圖片載入失敗，可能是檔案格式不支援。");
+                    alert("圖片格式錯誤，無法顯示。");
                     statusDiv.innerText = "";
-                    // 失敗時，直接把原圖存進去，不裁切了
-                    finishCardUpdate(imgUrl, index);
                 };
 
-            } catch(e) {
-                console.error(e);
-                alert("圖片下載失敗 (代理伺服器忙碌中)，將直接使用原圖。");
+            } catch (error) {
+                console.error(error);
+                alert(`❌ 圖片無法下載！\n\n這張圖片的網站可能鎖得很死。\n建議：對圖片按右鍵「另存新檔」，然後用「上傳背景」的功能來裁切。`);
                 statusDiv.innerText = "";
+                // 雖然不能切，還是把原圖存回去，至少能用
                 finishCardUpdate(imgUrl, index);
             }
         }
