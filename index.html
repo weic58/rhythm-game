@@ -1006,21 +1006,20 @@
             }
         }
 
-        // --- 3. 選定條目後：封面圖優先 + Proxy 連線救援 (修正抓圖失敗問題) ---
+        // --- 修復版：點擊列表抓圖 (含 Proxy 救援機制) ---
         async function selectWikiEntry(index, exactTitle, source, overlay) {
-            overlay.innerHTML = '<div style="margin:auto;">正在下載圖片...</div>';
+            overlay.innerHTML = '<div style="margin:auto; color:#333;">⏳ 正在下載資料...</div>';
             
-            const imgEl = document.getElementById(`prev-img-${index}`);
-            const inputEl = document.getElementById(`input-${index}`); 
-
-            // 定義內部請求函式 (含 Proxy 救援)
+            // 定義救援函式：如果直連失敗，就走代理伺服器
             const fetchWithProxy = async (targetUrl) => {
                 try {
-                    const res = await fetch(targetUrl);
-                    if (!res.ok) throw new Error("Direct fetch failed");
+                    // 1. 先嘗試直連 (有些網站允許)
+                    const res = await fetch(targetUrl); 
+                    if (!res.ok) throw new Error("Direct fail");
                     return await res.json();
                 } catch (e) {
-                    console.warn("直接連線失敗，切換 Proxy...", e);
+                    // 2. 直連失敗，改用 Proxy (解決本機 file:/// 跨域問題)
+                    console.warn("直連失敗，切換線路...");
                     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
                     const resProxy = await fetch(proxyUrl);
                     return await resProxy.json();
@@ -1029,84 +1028,69 @@
 
             try {
                 let imgUrl = null;
-                let otherImages = [];
-
                 const isChinese = /[\u4e00-\u9fa5]/.test(exactTitle);
                 const baseUrl = (source === 'wiki' && isChinese)
                     ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
-                    : 'https://en.wikipedia.org/w/api.php';
+                    : (source === 'wiki' ? 'https://en.wikipedia.org/w/api.php' : 'https://commons.wikimedia.org/w/api.php');
 
-                // 步驟 A: 先抓「封面圖」 (與列表縮圖一致)
+                // 步驟 A: 抓封面圖
                 if (source === 'wiki') {
                     const coverUrl = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&prop=pageimages&pithumbsize=600&format=json&origin=*`;
-                    const dataCover = await fetchWithProxy(coverUrl); // 使用救援函式
+                    const dataCover = await fetchWithProxy(coverUrl);
                     if (dataCover.query && dataCover.query.pages) {
                         const p = Object.values(dataCover.query.pages)[0];
                         if (p.thumbnail) imgUrl = p.thumbnail.source;
                     }
                 }
 
-                // 步驟 B: 抓「頁內其他圖片」 (作為換一張的備選)
-                // 如果是 Commons，直接抓 imageinfo
+                // 步驟 B: 抓頁內圖 (備用)
                 let imagesUrl = '';
                 if (source === 'wiki') {
                     imagesUrl = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&generator=images&gimlimit=10&prop=imageinfo&iiprop=url&format=json&origin=*`;
                 } else {
-                    // Commons 直接抓本體
                     imagesUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(exactTitle)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
                 }
 
-                const dataImages = await fetchWithProxy(imagesUrl); // 使用救援函式
-                
+                const dataImages = await fetchWithProxy(imagesUrl);
+                let otherImages = [];
                 if (dataImages.query && dataImages.query.pages) {
-                    const pages = Object.values(dataImages.query.pages);
-                    for (let p of pages) {
-                        if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].url) {
+                    Object.values(dataImages.query.pages).forEach(p => {
+                        if (p.imageinfo && p.imageinfo[0]) {
                             const u = p.imageinfo[0].url;
                             const lowerU = u.toLowerCase();
-                            // 過濾雜訊 (排除 svg, icon 等)
-                            if (!lowerU.endsWith('.svg') && !lowerU.includes('icon') && !lowerU.includes('ambox') && u !== imgUrl) {
+                            if (!lowerU.endsWith('.svg') && !lowerU.includes('icon') && u !== imgUrl) {
                                 otherImages.push(u);
                             }
                         }
-                    }
+                    });
                 }
 
-                // 整合：封面圖排第一
+                // 整合圖片
                 let finalImages = [];
                 if (imgUrl) finalImages.push(imgUrl);
-                // 如果 Commons 沒抓到封面 (通常 Commons 只有單張圖)，就用 imageinfo 的圖
                 if (!imgUrl && otherImages.length > 0) finalImages.push(otherImages[0]);
-                else if (imgUrl && otherImages.length > 0) finalImages = [...finalImages, ...otherImages];
-                else if (!imgUrl && otherImages.length === 0) {
-                     // 真的完全沒圖
-                } else {
-                     // 只有封面圖
-                     finalImages = [imgUrl];
-                }
+                else if (imgUrl) finalImages = [...finalImages, ...otherImages];
 
-                // 去除重複
-                finalImages = [...new Set(finalImages)];
+                finalImages = [...new Set(finalImages)]; // 去除重複
 
                 if (finalImages.length > 0) {
-                    // ★★★ 改成：啟動裁切器，而不是直接更新 ★★★
-                    // 傳入第一張圖 (封面圖) 給裁切器
-                    startCropperForWiki(finalImages[0], index);
+                    // 更新介面
+                    tempSearchItems[index].images = finalImages;
+                    tempSearchItems[index].currentIndex = 0;
                     
-                    if (!tempSearchItems[index].backupImages) {
-                         tempSearchItems[index].backupImages = finalImages;
-                    }
+                    // 更新預覽畫面 (這裡不需要自動開啟裁切，只更新圖片)
+                    const imgEl = document.getElementById(`prev-img-${index}`);
+                    if(imgEl) imgEl.src = finalImages[0];
                     
-                    overlay.remove(); 
+                    overlay.remove();
                 } else {
-                    alert(`條目「${exactTitle}」裡找不到適合的圖片。`);
+                    alert("這則條目找不到適合的圖片，請試試別的。");
                     overlay.remove();
                 }
-            
-            // ★★★ 之前這裡斷掉了，少了 catch 和結尾括號，請務必補上！ ★★★
+
             } catch(e) {
                 console.error(e);
-                alert("抓圖失敗 (請檢查網路或 AdBlock)");
+                alert("抓圖發生錯誤 (請檢查網路連線)");
                 overlay.remove();
             }
         }
@@ -1638,61 +1622,59 @@
             startCropperForWiki(currentImgUrl, index);
         }
 
-        // --- 修正版：裁切啟動器 (GitHub Pages 專用高速版) ---
-        function startCropperForWiki(imgUrl, index) {
+        // --- 修復版：裁切啟動器 (強制 Proxy 下載模式) ---
+        async function startCropperForWiki(imgUrl, index) {
             const statusDiv = document.getElementById('search-status');
-            statusDiv.innerText = "⏳ 載入圖片中...";
+            statusDiv.innerText = "⏳ 正在下載圖片...";
             
-            cropTargetType = 'card';
-            cropTargetIndex = index;
-            
-            const img = document.getElementById('cropper-img');
-            
-            // 1. 清空舊的狀態
-            img.onload = null;
-            img.onerror = null;
-            img.src = "";
-            
-            // 2. 設定跨域屬性 (這在 GitHub Pages 上非常重要，能讓 Canvas 讀取圖片)
-            img.crossOrigin = "Anonymous";
-            
-            // 3. 處理圖片網址 (加入時間戳記 ?t=... 以避開快取導致的跨域錯誤)
-            let finalUrl = imgUrl;
-            if (imgUrl.startsWith('http')) {
-                finalUrl = imgUrl + (imgUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-            }
-            
-            // 4. 開始載入
-            img.src = finalUrl;
+            try {
+                let objectUrl = imgUrl;
 
-            // 成功載入 (通常維基圖片會走這裡，速度很快)
-            img.onload = () => {
-                document.getElementById('cropper-modal').style.display = 'flex';
-                document.getElementById('crop-box').style.display = 'none';
-                cropState = { startX: 0, startY: 0, isDragging: false, rect: {} };
-                statusDiv.innerText = "✂️ 請拖曳裁切範圍";
-            };
-
-            // 失敗救援 (如果對方網站擋住，才改用 Proxy 下載)
-            img.onerror = async () => {
-                console.warn("直連失敗，切換線路...");
-                statusDiv.innerText = "⏳ 切換線路下載中...";
-                try {
-                    // 使用 Proxy 下載成 Blob
-                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}`;
-                    const res = await fetch(proxyUrl);
-                    if(!res.ok) throw new Error("Proxy Fail");
-                    const blob = await res.blob();
+                // ★ 強制下載：只要是網路網址，全部走 Proxy 下載成 Blob
+                // 這能解決 99% 的「本機開啟無法裁切」問題
+                if (imgUrl.startsWith('http')) {
+                    // 加一個時間戳記 t=... 防止快取問題
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}&t=${Date.now()}`;
                     
-                    // 重新載入 Blob (這時候就不需要 crossOrigin 了)
-                    img.crossOrigin = ""; 
-                    img.src = URL.createObjectURL(blob);
-                } catch(e) {
-                    alert("這張圖片受到保護，無法進行裁切，請換一張試試。");
-                    statusDiv.innerText = "";
-                    document.getElementById('cropper-modal').style.display = 'none';
+                    const res = await fetch(proxyUrl);
+                    if(!res.ok) throw new Error("Proxy download failed");
+                    
+                    const blob = await res.blob();
+                    objectUrl = URL.createObjectURL(blob);
                 }
-            };
+
+                // 設定裁切目標
+                cropTargetType = 'card';
+                cropTargetIndex = index;
+
+                // 載入圖片到裁切器
+                const img = document.getElementById('cropper-img');
+                // 清除舊的事件監聽，防止干擾
+                img.onload = null;
+                img.onerror = null;
+                
+                img.src = objectUrl;
+                
+                img.onload = () => {
+                    document.getElementById('cropper-modal').style.display = 'flex';
+                    document.getElementById('crop-box').style.display = 'none';
+                    cropState = { startX: 0, startY: 0, isDragging: false, rect: {} };
+                    statusDiv.innerText = "✂️ 請拖曳裁切範圍";
+                };
+
+                img.onerror = () => {
+                    alert("圖片載入失敗，可能是檔案格式不支援。");
+                    statusDiv.innerText = "";
+                    // 失敗時，直接把原圖存進去，不裁切了
+                    finishCardUpdate(imgUrl, index);
+                };
+
+            } catch(e) {
+                console.error(e);
+                alert("圖片下載失敗 (代理伺服器忙碌中)，將直接使用原圖。");
+                statusDiv.innerText = "";
+                finishCardUpdate(imgUrl, index);
+            }
         }
 
         // 2. 滑鼠/觸控 拖曳邏輯
