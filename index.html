@@ -1245,7 +1245,7 @@
             tempImg.src = newUrl;
         }
 
-        // --- 修正版：預覽介面 (按鈕改為只傳 index) ---
+        // --- 修正版：預覽介面 (含 AI 按鈕 + 安全裁切) ---
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
@@ -1256,11 +1256,14 @@
                 const div = document.createElement('div');
                 div.className = 'preview-item';
                 
+                // 取得目前圖片
                 const currentImg = slot.images[slot.currentIndex % slot.images.length] || 'https://placehold.co/200x200?text=NoImg';
                 
                 div.innerHTML = `
                     <div class="preview-toolbar">
                         <button class="btn-mini btn-crop" onclick="prepareCrop(${index})" title="裁切" style="background:orange;">✂️</button>
+                        
+                        <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="AI 生圖" style="background:#a55eea;">✨</button>
                         
                         <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張">🔄</button>
                         <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
@@ -1609,11 +1612,11 @@
             document.getElementById('cropper-modal').style.display = 'none';
         }
 
-        // --- 新增：裁切準備函式 ---
+        // --- 1. 安全裁切準備 (中繼站) ---
         function prepareCrop(index) {
             const slot = tempSearchItems[index];
             if (!slot || slot.images.length === 0) return;
-            // 從記憶體拿網址，絕對安全
+            // 從記憶體拿網址，這樣絕對不會因為網址有怪符號而壞掉
             const url = slot.images[slot.currentIndex % slot.images.length];
             startCropperForWiki(url, index);
         }
@@ -1630,17 +1633,17 @@
             startCropperForWiki(currentImgUrl, index);
         }
 
-        // --- 終極修正版：強力裁切啟動器 ---
+        // --- 終極修正版：裁切啟動器 (三段式救援 + HTTPS 強制) ---
         async function startCropperForWiki(imgUrl, index) {
             const statusDiv = document.getElementById('search-status');
             statusDiv.innerText = "⏳ 正在下載圖片...";
             
-            // 強制轉為 HTTPS (GitHub Pages 必要)
+            // 1. 強制轉為 HTTPS (GitHub Pages 必須！)
             if (imgUrl.startsWith('http:')) {
                 imgUrl = imgUrl.replace('http:', 'https:');
             }
 
-            // 下載小幫手
+            // 下載小幫手 (將圖片轉為 Blob)
             const tryFetch = async (url) => {
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Fetch failed");
@@ -1650,25 +1653,26 @@
             try {
                 let blob = null;
 
-                // 1. 優先嘗試：直連 (維基百科通常支援)
+                // A計畫：嘗試直連 (速度最快)
                 try {
-                    console.log("嘗試直連...");
                     blob = await tryFetch(imgUrl);
                 } catch (e1) {
-                    // 2. 失敗嘗試：Proxy A (AllOrigins)
+                    // B計畫：Proxy A (AllOrigins)
                     try {
                         console.warn("直連失敗，嘗試 Proxy A...");
                         statusDiv.innerText = "⏳ 轉接線路 A...";
                         const proxyA = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}`;
                         blob = await tryFetch(proxyA);
                     } catch (e2) {
-                        // 3. 失敗嘗試：Proxy B (CorsProxy)
+                        // C計畫：Proxy B (CorsProxy)
                         console.warn("Proxy A 失敗，嘗試 Proxy B...");
                         statusDiv.innerText = "⏳ 轉接線路 B...";
                         const proxyB = `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`;
                         blob = await tryFetch(proxyB);
                     }
                 }
+
+                if (!blob) throw new Error("All methods failed");
 
                 // 成功取得檔案！
                 const objectUrl = URL.createObjectURL(blob);
@@ -1677,7 +1681,10 @@
                 cropTargetIndex = index;
 
                 const img = document.getElementById('cropper-img');
+                // 清除舊事件
                 img.onload = null;
+                img.onerror = null;
+                
                 img.src = objectUrl;
                 
                 img.onload = () => {
@@ -1687,16 +1694,11 @@
                     statusDiv.innerText = "✂️ 請拖曳裁切範圍";
                 };
 
-                img.onerror = () => {
-                    alert("圖片格式錯誤，無法顯示。");
-                    statusDiv.innerText = "";
-                };
-
             } catch (error) {
                 console.error(error);
-                alert(`❌ 圖片無法下載！\n\n這張圖片的網站可能鎖得很死。\n建議：對圖片按右鍵「另存新檔」，然後用「上傳背景」的功能來裁切。`);
+                alert(`❌ 圖片下載失敗！\n\nGitHub 安全性限制較高，建議您：\n1. 對圖片按右鍵「另存新檔」\n2. 使用下方「自訂遊戲背景」上傳該圖\n3. 裁切後再到這裡使用。`);
                 statusDiv.innerText = "";
-                // 雖然不能切，還是把原圖存回去，至少能用
+                // 雖然不能切，還是更新上去
                 finishCardUpdate(imgUrl, index);
             }
         }
