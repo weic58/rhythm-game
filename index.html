@@ -89,6 +89,8 @@
             font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
+        /* 新增：裁切按鈕 (橘色) */
+        .btn-crop { background: rgba(230, 126, 34, 0.9); }
         .btn-swap { background: rgba(84, 160, 255, 0.9); }
         .btn-remove { background: rgba(255, 107, 107, 0.9); }
         .btn-mini:hover { transform: scale(1.1); }
@@ -624,6 +626,10 @@
         let searchData = {}; 
         let tempSearchItems = []; 
 
+        // --- 新增變數：記錄裁切目標 ---
+        let cropTargetType = 'bg'; // 'bg' (背景) 或 'card' (卡片)
+        let cropTargetIndex = -1;  // 如果是卡片，記錄是第幾格
+
         let gameState = {
             round: 0, maxRounds: 3, theme: 'flags', bpm: 165,
             offset: 0, interval: 0, introSeconds: 2.4, playbackRate: 1.0, 
@@ -1028,7 +1034,7 @@
                 const isChinese = /[\u4e00-\u9fa5]/.test(exactTitle);
                 const baseUrl = (source === 'wiki' && isChinese)
                     ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
-                    : (source === 'wiki' ? 'https://en.wikipedia.org/w/api.php' : 'https://commons.wikimedia.org/w/api.php');
+                    : 'https://en.wikipedia.org/w/api.php';
 
                 // 步驟 A: 先抓「封面圖」 (與列表縮圖一致)
                 if (source === 'wiki') {
@@ -1083,27 +1089,52 @@
                 finalImages = [...new Set(finalImages)];
 
                 if (finalImages.length > 0) {
-                    // 更新數據
-                    tempSearchItems[index].images = finalImages; 
-                    tempSearchItems[index].currentIndex = 0;
-                    tempSearchItems[index].isAI = false;
-
-                    // 更新畫面
-                    imgEl.src = finalImages[0];
-                    // 鎖定文字為輸入框的值
-                    tempSearchItems[index].label = inputEl.value; 
-
+                    // ★★★ 改成：啟動裁切器，而不是直接更新 ★★★
+                    // 傳入第一張圖 (封面圖) 給裁切器
+                    startCropperForWiki(finalImages[0], index);
+                    
+                    if (!tempSearchItems[index].backupImages) {
+                         tempSearchItems[index].backupImages = finalImages;
+                    }
+                    
                     overlay.remove(); 
                 } else {
                     alert(`條目「${exactTitle}」裡找不到適合的圖片。`);
                     overlay.remove();
                 }
-
+            
+            // ★★★ 之前這裡斷掉了，少了 catch 和結尾括號，請務必補上！ ★★★
             } catch(e) {
                 console.error(e);
                 alert("抓圖失敗 (請檢查網路或 AdBlock)");
                 overlay.remove();
             }
+        }
+
+        // --- 13. 完成卡片更新 (裁切後呼叫) ---
+        function finishCardUpdate(imgData, index) {
+            const imgEl = document.getElementById(`prev-img-${index}`);
+            const inputEl = document.getElementById(`input-${index}`);
+
+            // 更新數據
+            tempSearchItems[index].images = [imgData]; // 設定為裁切後的圖
+            
+            // 如果有之前抓到的備用圖 (換一張用)，可以補回去
+            // (注意：換一張會把裁切過的圖換掉，變回原始的維基圖)
+            if (tempSearchItems[index].backupImages) {
+                // 把裁切圖放在第一張，後面接原本的維基圖
+                const backups = tempSearchItems[index].backupImages;
+                tempSearchItems[index].images = [imgData, ...backups];
+            }
+
+            tempSearchItems[index].currentIndex = 0;
+            tempSearchItems[index].isAI = false;
+            
+            // 鎖定標題
+            if(inputEl) tempSearchItems[index].label = inputEl.value;
+
+            // 更新畫面
+            if(imgEl) imgEl.src = imgData;
         }
 
         // --- 8. 系統存檔與管理員功能 (新功能) ---
@@ -1230,7 +1261,7 @@
             tempImg.src = newUrl;
         }
 
-        // --- 修正版 2：渲染介面 (加入即時改名功能) ---
+        // --- 修正版 3：渲染介面 (加入裁切按鈕) ---
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
@@ -1243,10 +1274,10 @@
                 
                 const currentImg = slot.images[slot.currentIndex % slot.images.length] || 'https://placehold.co/200x200?text=NoImg';
                 
-                // ★★★ 關鍵修改：input 加入 oninput 事件 ★★★
-                // 這樣你改了文字，就算不按搜尋，最後送出時也會是你改過的字
                 div.innerHTML = `
                     <div class="preview-toolbar">
+                        <button class="btn-mini btn-crop" onclick="cropPreviewImage(${index})" title="裁切這張圖">✂️</button>
+                        
                         <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="用關鍵字AI生成">✨</button>
                         <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張(維基)">🔄</button>
                         <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
@@ -1573,6 +1604,8 @@
         function startCropper(input) {
             if (!input.files || !input.files[0]) return;
             
+            cropTargetType = 'bg'; // ★ 加入這行：標記現在是切背景
+            
             const file = input.files[0];
             const reader = new FileReader();
             
@@ -1591,6 +1624,75 @@
 
         function closeCropper() {
             document.getElementById('cropper-modal').style.display = 'none';
+        }
+
+        // --- 14. 手動觸發裁切 (新按鈕功能) ---
+        function cropPreviewImage(index) {
+            const slot = tempSearchItems[index];
+            if (!slot || slot.images.length === 0) return;
+
+            // 取得目前顯示的那張圖
+            const currentImgUrl = slot.images[slot.currentIndex % slot.images.length];
+            
+            // 呼叫裁切啟動器
+            startCropperForWiki(currentImgUrl, index);
+        }
+
+        // --- 修正版：裁切啟動器 (GitHub Pages 專用高速版) ---
+        function startCropperForWiki(imgUrl, index) {
+            const statusDiv = document.getElementById('search-status');
+            statusDiv.innerText = "⏳ 載入圖片中...";
+            
+            cropTargetType = 'card';
+            cropTargetIndex = index;
+            
+            const img = document.getElementById('cropper-img');
+            
+            // 1. 清空舊的狀態
+            img.onload = null;
+            img.onerror = null;
+            img.src = "";
+            
+            // 2. 設定跨域屬性 (這在 GitHub Pages 上非常重要，能讓 Canvas 讀取圖片)
+            img.crossOrigin = "Anonymous";
+            
+            // 3. 處理圖片網址 (加入時間戳記 ?t=... 以避開快取導致的跨域錯誤)
+            let finalUrl = imgUrl;
+            if (imgUrl.startsWith('http')) {
+                finalUrl = imgUrl + (imgUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+            }
+            
+            // 4. 開始載入
+            img.src = finalUrl;
+
+            // 成功載入 (通常維基圖片會走這裡，速度很快)
+            img.onload = () => {
+                document.getElementById('cropper-modal').style.display = 'flex';
+                document.getElementById('crop-box').style.display = 'none';
+                cropState = { startX: 0, startY: 0, isDragging: false, rect: {} };
+                statusDiv.innerText = "✂️ 請拖曳裁切範圍";
+            };
+
+            // 失敗救援 (如果對方網站擋住，才改用 Proxy 下載)
+            img.onerror = async () => {
+                console.warn("直連失敗，切換線路...");
+                statusDiv.innerText = "⏳ 切換線路下載中...";
+                try {
+                    // 使用 Proxy 下載成 Blob
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}`;
+                    const res = await fetch(proxyUrl);
+                    if(!res.ok) throw new Error("Proxy Fail");
+                    const blob = await res.blob();
+                    
+                    // 重新載入 Blob (這時候就不需要 crossOrigin 了)
+                    img.crossOrigin = ""; 
+                    img.src = URL.createObjectURL(blob);
+                } catch(e) {
+                    alert("這張圖片受到保護，無法進行裁切，請換一張試試。");
+                    statusDiv.innerText = "";
+                    document.getElementById('cropper-modal').style.display = 'none';
+                }
+            };
         }
 
         // 2. 滑鼠/觸控 拖曳邏輯
@@ -1649,8 +1751,8 @@
             cropState.isDragging = false;
         }
 
-        // 3. 確認裁切並儲存
-        function confirmCrop() {
+        // --- 修正版：確認裁切 (支援 背景/卡片 雙模式) ---
+        async function confirmCrop() {
             const img = document.getElementById('cropper-img');
             const rect = cropState.rect;
 
@@ -1659,42 +1761,65 @@
                 return;
             }
 
-            // 計算真實圖片與顯示圖片的比例
-            // 因為圖片在螢幕上可能被縮小顯示 (max-height: 60vh)
-            const displayedWidth = img.offsetWidth;
-            const displayedHeight = img.offsetHeight;
-            const naturalWidth = img.naturalWidth;
-            const naturalHeight = img.naturalHeight;
-            
-            const scaleX = naturalWidth / displayedWidth;
-            const scaleY = naturalHeight / displayedHeight;
+            // 計算比例
+            const scaleX = img.naturalWidth / img.offsetWidth;
+            const scaleY = img.naturalHeight / img.offsetHeight;
 
-            // 建立 Canvas 進行裁切
-            const canvas = document.createElement('canvas');
-            canvas.width = rect.width * scaleX;
-            canvas.height = rect.height * scaleY;
-            const ctx = canvas.getContext('2d');
+            // 內部函式：執行裁切並回傳 Base64
+            const doCrop = (maxSide, quality) => {
+                const canvas = document.createElement('canvas');
+                let targetW = rect.width * scaleX;
+                let targetH = rect.height * scaleY;
 
-            // drawImage(source, srcX, srcY, srcW, srcH, destX, destY, destW, destH)
-            ctx.drawImage(
-                img, 
-                rect.left * scaleX, rect.top * scaleY, 
-                rect.width * scaleX, rect.height * scaleY, 
-                0, 0, 
-                canvas.width, canvas.height
-            );
+                // 縮放限制 (避免檔案過大)
+                if (targetW > maxSide || targetH > maxSide) {
+                    const ratio = Math.min(maxSide / targetW, maxSide / targetH);
+                    targetW *= ratio;
+                    targetH *= ratio;
+                }
 
-            // 壓縮並轉為 Base64 (避免 localStorage 爆滿，限制寬度 1920，品質 0.8)
-            let outputData = canvas.toDataURL('image/jpeg', 0.8);
-            
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d');
+
+                ctx.drawImage(
+                    img, 
+                    rect.left * scaleX, rect.top * scaleY, 
+                    rect.width * scaleX, rect.height * scaleY, 
+                    0, 0, 
+                    canvas.width, canvas.height
+                );
+
+                return canvas.toDataURL('image/jpeg', quality);
+            };
+
             try {
-                localStorage.setItem('rg_bg_image', outputData);
-                applyBackground();
+                // 1. 產生裁切後的圖片 (卡片不用太大，800px夠了)
+                const finalData = doCrop(1000, 0.8);
+
+                // 2. 判斷要存去哪裡
+                if (cropTargetType === 'bg') {
+                    // --- 存背景 ---
+                    try {
+                        localStorage.removeItem('rg_bg_image');
+                        localStorage.setItem('rg_bg_image', finalData);
+                        applyBackground();
+                        document.getElementById('search-status').innerText = "✅ 背景設定完成";
+                    } catch (e) {
+                        alert("背景圖太大存不下，請試著切小一點。");
+                    }
+                } else {
+                    // --- 存卡片 ---
+                    // 呼叫更新函式，把這張 Base64 圖塞進去
+                    finishCardUpdate(finalData, cropTargetIndex);
+                    document.getElementById('search-status').innerText = "✅ 圖片裁切完成";
+                }
+
                 closeCropper();
-                alert("✅ 背景設定成功！");
+
             } catch (e) {
-                alert("圖片太大，無法儲存到瀏覽器，請試著裁切小一點的範圍。");
                 console.error(e);
+                alert("裁切發生錯誤");
             }
         }
 
