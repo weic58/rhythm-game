@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>節奏遊戲 Plus</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         :root {
             --primary-color: #ff4757;
@@ -344,6 +346,20 @@
             padding: 20px; border-radius: 20px;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
         }
+
+        /* 雲端功能專用樣式 */
+        .cloud-section { margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 8px; border: 2px solid #2196f3; }
+        .cloud-list { max-height: 200px; overflow-y: auto; background: white; border: 1px solid #ccc; margin-top: 5px; border-radius: 5px; }
+        .cloud-item { 
+            padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; 
+        }
+        .cloud-item:last-child { border-bottom: none; }
+        .cloud-item span { font-size: 0.9rem; font-weight: bold; color: #333; }
+        .btn-small { 
+            padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; color: white; margin-left: 5px; 
+        }
+        .btn-dl { background: #27ae60; }
+        .btn-del-cloud { background: #c0392b; }
     </style>
 </head>
 <body>
@@ -527,7 +543,38 @@
                 <input type="range" id="interval-input" min="0" max="5" value="0" step="0.5" oninput="saveSettings()">
                 <div style="text-align:right; font-weight:bold; color:#555;"><span id="interval-display">0</span> 秒</div>
             </div>
-            
+
+            <div class="control-group" style="border: 2px solid #2196f3; background: #e3f2fd;">
+                <label style="color:#1565c0;">☁️ 雲端主題庫 (Firebase)</label>
+                
+                <div style="margin-bottom: 10px;">
+                    <div id="firebase-status" style="font-weight:bold; color:red; font-size:0.9rem; margin-bottom:5px;">🔴 未連線</div>
+                    <button class="btn-action" onclick="toggleDbConfig()" style="background:#607d8b; width:100%;">⚙️ 設定資料庫金鑰</button>
+                    <div id="db-config-area" style="display:none; margin-top:5px;">
+                        <textarea id="firebase-config-input" rows="3" placeholder='貼上 Firebase Config JSON' style="width:100%; font-size:0.8rem;"></textarea>
+                        <button class="btn-primary" style="width:100%; font-size:0.9rem; margin-top:3px;" onclick="connectFirebase()">🔗 連線</button>
+                    </div>
+                </div>
+
+                <div style="border-top:1px dashed #aaa; padding-top:10px; margin-bottom:10px;">
+                    <label style="font-size:0.9rem;">📤 上傳主題 (需密碼)</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="upload-select" style="flex:1;">
+                            <option value="">-- 請選擇本機主題 --</option>
+                        </select>
+                        <button class="btn-action" style="background:#2196f3;" onclick="uploadSelectedTheme()">⬆️ 上傳</button>
+                    </div>
+                </div>
+
+                <div style="border-top:1px dashed #aaa; padding-top:10px;">
+                    <label style="font-size:0.9rem;">📥 雲端列表 (點擊下載)</label>
+                    <button class="btn-action" style="background:#ff9800; width:100%; margin-bottom:5px;" onclick="fetchCloudThemes()">🔄 重新整理列表</button>
+                    <div id="cloud-list-container" class="cloud-list">
+                        <div style="padding:10px; text-align:center; color:#666;">請先連線並按重新整理</div>
+                    </div>
+                </div>
+            </div>
+
             <button class="btn-primary" style="width:100%; font-size:1rem;" onclick="closeSettingsBtn()">完成</button>
         </div>
     </div>
@@ -625,6 +672,8 @@
         let customData = {}; 
         let searchData = {}; 
         let tempSearchItems = []; 
+
+        let adminPassword = "8888"; // 你可以把 8888 改成任何你想要的數字或文字
 
         // --- 新增變數：記錄裁切目標 ---
         let cropTargetType = 'bg'; // 'bg' (背景) 或 'card' (卡片)
@@ -1918,6 +1967,9 @@
             loadSettings();
             applyBackground();
             updateThemeSelect();
+            // ★ 加入這行
+            autoConnectFirebase();
+            updateUploadSelect(); // 初始化上傳選單
         });
 
         // --- 5. 遊戲核心 ---
@@ -2267,6 +2319,175 @@
             document.getElementById('end-screen').style.display = 'none';
             document.getElementById('home-screen').classList.remove('hidden');
             document.getElementById('home-screen').style.display = 'flex';
+        }
+
+        // --- Firebase 雲端主題庫功能 (V13 新增) ---
+        let db = null;
+
+        function toggleDbConfig() {
+            const el = document.getElementById('db-config-area');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // --- 修正版：連線 Firebase (支援寬容格式) ---
+        function connectFirebase() {
+            const configStr = document.getElementById('firebase-config-input').value.trim();
+            if (!configStr) return alert("請輸入 Config");
+            
+            try {
+                // ★ 關鍵修改：先做字串清理
+                let cleanStr = configStr;
+                
+                // 1. 如果使用者複製到 'const firebaseConfig = '，幫忙去掉前面
+                if (cleanStr.includes('=')) {
+                    cleanStr = cleanStr.split('=')[1];
+                }
+
+                // 2. 改用 new Function 來解析 (比 JSON.parse 更強大)
+                // 這樣就算 key 沒有引號 (apiKey: ...) 或結尾有分號 (;)，也能正確讀取
+                const config = new Function("return " + cleanStr)();
+
+                // 3. 執行連線
+                if (!firebase.apps.length) firebase.initializeApp(config);
+                db = firebase.database();
+                
+                // 存檔並更新介面
+                localStorage.setItem('rg_firebase_config', configStr);
+                
+                document.getElementById('firebase-status').innerText = "🟢 已連線";
+                document.getElementById('firebase-status').style.color = "green";
+                document.getElementById('db-config-area').style.display = 'none';
+                
+                updateUploadSelect(); // 更新可上傳列表
+                alert("✅ 連線成功！");
+
+            } catch (e) {
+                console.error(e);
+                alert("連線失敗！請確認你複製的是大括號 { ... } 的內容\n錯誤訊息: " + e.message);
+            }
+        }
+
+        // 自動嘗試連線 (開啟網頁時)
+        function autoConnectFirebase() {
+            const savedConfig = localStorage.getItem('rg_firebase_config');
+            if (savedConfig) {
+                document.getElementById('firebase-config-input').value = savedConfig;
+                connectFirebase();
+            }
+        }
+
+        // 2. 更新「上傳下拉選單」的內容 (列出所有自訂主題)
+        function updateUploadSelect() {
+            const select = document.getElementById('upload-select');
+            select.innerHTML = '<option value="">-- 請選擇本機主題 --</option>';
+            for (let key in searchData) {
+                const theme = searchData[key];
+                const option = document.createElement('option');
+                option.value = key;
+                option.innerText = theme.title || "未命名主題";
+                select.appendChild(option);
+            }
+        }
+
+        // 3. 上傳選定的主題 (需密碼)
+        function uploadSelectedTheme() {
+            if (!db) return alert("請先連線資料庫");
+            const key = document.getElementById('upload-select').value;
+            if (!key) return alert("請選擇要上傳的主題");
+
+            // 密碼確認
+            if (prompt("🔒 請輸入管理員密碼以確認上傳：") !== adminPassword) {
+                return alert("密碼錯誤，拒絕上傳。");
+            }
+
+            const themeData = searchData[key];
+            const safeKey = key; // 使用原本的 key (例如 search_123456)
+
+            // 上傳到 'public_themes' 節點
+            db.ref('public_themes/' + safeKey).set({
+                title: themeData.title,
+                images: themeData.images,
+                author: "Teacher", // 你可以改成自訂名稱
+                date: new Date().toLocaleString()
+            }).then(() => {
+                alert(`✅ 主題「${themeData.title}」上傳成功！`);
+                fetchCloudThemes(); // 上傳後順便更新列表
+            }).catch(e => {
+                alert("上傳失敗: " + e.message);
+            });
+        }
+
+        // 4. 抓取雲端列表
+        function fetchCloudThemes() {
+            if (!db) return alert("請先連線資料庫");
+            const listDiv = document.getElementById('cloud-list-container');
+            listDiv.innerHTML = '<div style="padding:10px; text-align:center;">⏳ 讀取中...</div>';
+
+            db.ref('public_themes').once('value').then(snapshot => {
+                const data = snapshot.val();
+                listDiv.innerHTML = ''; // 清空
+
+                if (!data) {
+                    listDiv.innerHTML = '<div style="padding:10px; text-align:center;">☁️ 雲端目前是空的</div>';
+                    return;
+                }
+
+                // 遍歷每一個主題
+                Object.keys(data).forEach(firebaseKey => {
+                    const theme = data[firebaseKey];
+                    const item = document.createElement('div');
+                    item.className = 'cloud-item';
+                    item.innerHTML = `
+                        <div style="flex:1;">
+                            <div>${theme.title}</div>
+                            <div style="font-size:0.7rem; color:#888;">📅 ${theme.date || '未知時間'}</div>
+                        </div>
+                        <button class="btn-small btn-dl" onclick="downloadCloudTheme('${firebaseKey}')">📥 下載</button>
+                        <button class="btn-small btn-del-cloud" onclick="deleteCloudTheme('${firebaseKey}')">🗑️</button>
+                    `;
+                    listDiv.appendChild(item);
+                });
+            });
+        }
+
+        // 5. 下載主題 (匯入到本機)
+        window.downloadCloudTheme = function(firebaseKey) { // 掛載到 window 確保 HTML 呼叫得到
+            if(!confirm("確定要下載並匯入這個主題嗎？")) return;
+            
+            db.ref('public_themes/' + firebaseKey).once('value').then(snap => {
+                const theme = snap.val();
+                if (theme) {
+                    // 寫入本地 searchData
+                    // 為了避免 ID 衝突，我們重新產生一個 ID
+                    const newLocalKey = "search_" + Date.now();
+                    searchData[newLocalKey] = {
+                        title: theme.title,
+                        images: theme.images
+                    };
+                    
+                    // 存檔並更新介面
+                    saveSearchData();
+                    updateThemeSelect();
+                    updateUploadSelect();
+                    
+                    // 自動切換到剛下載的主題
+                    document.getElementById('theme-select').value = newLocalKey;
+                    saveSettings();
+                    
+                    alert(`✅ 主題「${theme.title}」已下載並選用！`);
+                }
+            });
+        }
+
+        // 6. 刪除雲端主題 (需密碼)
+        window.deleteCloudTheme = function(firebaseKey) {
+            if (prompt("🔒 刪除雲端檔案需密碼：") !== adminPassword) return alert("密碼錯誤");
+            
+            db.ref('public_themes/' + firebaseKey).remove()
+              .then(() => {
+                  alert("已刪除");
+                  fetchCloudThemes(); // 重新整理
+              });
         }
     </script>
 </body>
