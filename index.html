@@ -545,30 +545,40 @@
             </div>
 
             <div class="control-group" style="border: 2px solid #2196f3; background: #e3f2fd;">
-                <label style="color:#1565c0;">☁️ 雲端主題庫 (Firebase)</label>
+                <label style="color:#1565c0;">☁️ 雲端資料庫 (分開管理)</label>
                 
-                <div style="margin-bottom: 10px; padding-bottom:10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-weight:bold; color:#1565c0;">連線狀態：</span>
-                        <span id="firebase-status" style="font-weight:bold; color:red;">⏳ 連線中...</span>
-                    </div>
+                <div style="margin-bottom: 10px;">
+                    <span style="font-weight:bold; color:#1565c0;">狀態：</span>
+                    <span id="firebase-status" style="font-weight:bold; color:red;">⏳ 連線中...</span>
                 </div>
 
-                <div style="border-top:1px dashed #aaa; padding-top:10px; margin-bottom:10px;">
-                    <label style="font-size:0.9rem;">📤 上傳主題 (需密碼)</label>
-                    <div style="display:flex; gap:5px;">
+                <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #bbdefb;">
+                    <label style="color:#1976d2; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:5px;">🎴 主題卡片 (不含音樂)</label>
+                    
+                    <div style="display:flex; gap:5px; margin-bottom:10px;">
                         <select id="upload-select" style="flex:1;">
-                            <option value="">-- 請選擇本機主題 --</option>
+                            <option value="">-- 選擇本機主題 --</option>
                         </select>
-                        <button class="btn-action" style="background:#2196f3;" onclick="uploadSelectedTheme()">⬆️ 上傳</button>
+                        <button class="btn-action" style="background:#2196f3;" onclick="uploadThemeOnly()">⬆️ 上傳卡片</button>
+                    </div>
+
+                    <button class="btn-action" style="background:#64b5f6; width:100%; font-size:0.8rem; margin-bottom:5px;" onclick="fetchCloudThemes()">🔄 整理主題列表</button>
+                    <div id="cloud-list-container" class="cloud-list" style="height:120px;">
+                        <div style="padding:10px; text-align:center; color:#666;">點擊重新整理</div>
                     </div>
                 </div>
 
-                <div style="border-top:1px dashed #aaa; padding-top:10px;">
-                    <label style="font-size:0.9rem;">📥 雲端列表 (點擊下載)</label>
-                    <button class="btn-action" style="background:#ff9800; width:100%; margin-bottom:5px;" onclick="fetchCloudThemes()">🔄 重新整理列表</button>
-                    <div id="cloud-list-container" class="cloud-list">
-                        <div style="padding:10px; text-align:center; color:#666;">請先連線並按重新整理</div>
+                <div style="background:white; padding:10px; border-radius:8px; border:1px solid #ffe0b2;">
+                    <label style="color:#ef6c00; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:5px;">🎵 背景與音樂 (媒體包)</label>
+                    
+                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                        <input type="text" id="media-pack-name" placeholder="替這組影音命名..." style="flex:1;">
+                        <button class="btn-action" style="background:#ff9800;" onclick="uploadMediaOnly()">⬆️ 上傳媒體</button>
+                    </div>
+
+                    <button class="btn-action" style="background:#ffb74d; width:100%; font-size:0.8rem; margin-bottom:5px;" onclick="fetchCloudMedia()">🔄 整理媒體列表</button>
+                    <div id="cloud-media-list" class="media-list" style="height:120px;">
+                        <div style="padding:10px; text-align:center; color:#666;">點擊重新整理</div>
                     </div>
                 </div>
             </div>
@@ -1480,20 +1490,35 @@
             document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
 
+        // --- 修正版：音樂檔案讀取 (加入容量限制) ---
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
+            
+            // ★ 安全檢查：限制音樂檔案不能超過 2.5 MB
+            // Firebase Realtime DB 不適合存大檔案，太大会直接卡死或失敗
+            const maxSize = 2.5 * 1024 * 1024; // 2.5MB
+            
+            if (file.size > maxSize) {
+                alert(`⚠️ 這首音樂太大了 (${(file.size/1024/1024).toFixed(1)} MB)！\n\n為了確保能上傳雲端，請使用 2.5MB 以下的檔案。\n(建議使用 mp3 剪輯工具，只剪副歌部分)`);
+                this.value = ''; // 清空選擇
+                return;
+            }
+
             document.getElementById('file-status').innerText = `⌛ 讀取中...`;
 
             const reader = new FileReader();
             reader.onload = function(evt) {
                 bgmAudio.src = evt.target.result;
                 bgmAudio.load();
-                document.getElementById('file-status').innerText = `✅ 本地檔案: ${file.name}`;
+                
+                // 存入暫存變數
+                currentMusicData = evt.target.result;
+                
+                document.getElementById('file-status').innerText = `✅ 音樂已載入 (${(file.size/1024/1024).toFixed(1)} MB)`;
             };
             reader.onerror = function() { alert("讀取失敗"); };
             reader.readAsDataURL(file);
-            this.value = ''; 
         });
 
         function testAudio() {
@@ -2375,106 +2400,210 @@
             }
         }
 
-        // 3. 上傳選定的主題 (需密碼)
-        function uploadSelectedTheme() {
-            if (!db) return alert("請先連線資料庫");
+        // --- Firebase 分離式管理功能 ---
+
+        // ==============================
+        // 1. 主題卡片區 (Themes)
+        // ==============================
+
+        // 上傳純主題 (Cards Only)
+        function uploadThemeOnly() {
+            if (!db) return alert("請先連線");
             const key = document.getElementById('upload-select').value;
-            if (!key) return alert("請選擇要上傳的主題");
+            if (!key) return alert("請選擇主題");
+            if (prompt("🔒 上傳主題需密碼：") !== adminPassword) return alert("密碼錯誤");
 
-            // 密碼確認
-            if (prompt("🔒 請輸入管理員密碼以確認上傳：") !== adminPassword) {
-                return alert("密碼錯誤，拒絕上傳。");
-            }
-
-            const themeData = searchData[key];
-            const safeKey = key; // 使用原本的 key (例如 search_123456)
-
-            // 上傳到 'public_themes' 節點
-            db.ref('public_themes/' + safeKey).set({
-                title: themeData.title,
-                images: themeData.images,
-                author: "Teacher", // 你可以改成自訂名稱
-                date: new Date().toLocaleString()
+            const data = searchData[key];
+            
+            // 寫入 public_themes (只含卡片)
+            db.ref('public_themes/' + key).set({
+                title: data.title,
+                images: data.images,
+                author: "Teacher",
+                date: new Date().toLocaleString(),
+                type: "cards_only" // 標記類型
             }).then(() => {
-                alert(`✅ 主題「${themeData.title}」上傳成功！`);
-                fetchCloudThemes(); // 上傳後順便更新列表
-            }).catch(e => {
-                alert("上傳失敗: " + e.message);
+                alert(`✅ 卡片主題「${data.title}」上傳成功！`);
+                fetchCloudThemes();
             });
         }
 
-        // 4. 抓取雲端列表
+        // 抓取主題列表
         function fetchCloudThemes() {
-            if (!db) return alert("請先連線資料庫");
-            const listDiv = document.getElementById('cloud-list-container');
-            listDiv.innerHTML = '<div style="padding:10px; text-align:center;">⏳ 讀取中...</div>';
+            if (!db) return;
+            const div = document.getElementById('cloud-list-container');
+            div.innerHTML = '<div style="padding:5px; text-align:center;">⏳...</div>';
+            
+            db.ref('public_themes').once('value').then(snap => {
+                const data = snap.val();
+                div.innerHTML = '';
+                if(!data) { div.innerHTML = '<div style="text-align:center;">無資料</div>'; return; }
 
-            db.ref('public_themes').once('value').then(snapshot => {
-                const data = snapshot.val();
-                listDiv.innerHTML = ''; // 清空
-
-                if (!data) {
-                    listDiv.innerHTML = '<div style="padding:10px; text-align:center;">☁️ 雲端目前是空的</div>';
-                    return;
-                }
-
-                // 遍歷每一個主題
-                Object.keys(data).forEach(firebaseKey => {
-                    const theme = data[firebaseKey];
+                Object.keys(data).forEach(k => {
+                    const t = data[k];
                     const item = document.createElement('div');
                     item.className = 'cloud-item';
                     item.innerHTML = `
-                        <div style="flex:1;">
-                            <div>${theme.title}</div>
-                            <div style="font-size:0.7rem; color:#888;">📅 ${theme.date || '未知時間'}</div>
+                        <div style="flex:1; overflow:hidden;">
+                            <div style="font-weight:bold; color:#1565c0;">${t.title}</div>
+                            <div style="font-size:0.7rem; color:#888;">${t.date.split(' ')[0]}</div>
                         </div>
-                        <button class="btn-small btn-dl" onclick="downloadCloudTheme('${firebaseKey}')">📥 下載</button>
-                        <button class="btn-small btn-del-cloud" onclick="deleteCloudTheme('${firebaseKey}')">🗑️</button>
+                        <button class="btn-small btn-dl" onclick="downloadCloudTheme('${k}')">📥</button>
+                        <button class="btn-small btn-del-cloud" onclick="deleteAny('${k}', 'public_themes')">🗑️</button>
                     `;
-                    listDiv.appendChild(item);
+                    div.appendChild(item);
                 });
             });
         }
 
-        // 5. 下載主題 (匯入到本機)
-        window.downloadCloudTheme = function(firebaseKey) { // 掛載到 window 確保 HTML 呼叫得到
-            if(!confirm("確定要下載並匯入這個主題嗎？")) return;
-            
-            db.ref('public_themes/' + firebaseKey).once('value').then(snap => {
-                const theme = snap.val();
-                if (theme) {
-                    // 寫入本地 searchData
-                    // 為了避免 ID 衝突，我們重新產生一個 ID
-                    const newLocalKey = "search_" + Date.now();
-                    searchData[newLocalKey] = {
-                        title: theme.title,
-                        images: theme.images
-                    };
-                    
-                    // 存檔並更新介面
+        // 下載主題 (只匯入卡片)
+        window.downloadCloudTheme = function(key) {
+            if(!confirm("下載並切換至此卡片主題？")) return;
+            db.ref('public_themes/' + key).once('value').then(snap => {
+                const val = snap.val();
+                if(val) {
+                    const newKey = "search_" + Date.now();
+                    searchData[newKey] = { title: val.title, images: val.images };
                     saveSearchData();
                     updateThemeSelect();
                     updateUploadSelect();
-                    
-                    // 自動切換到剛下載的主題
-                    document.getElementById('theme-select').value = newLocalKey;
+                    document.getElementById('theme-select').value = newKey;
                     saveSettings();
-                    
-                    alert(`✅ 主題「${theme.title}」已下載並選用！`);
+                    alert(`✅ 主題「${val.title}」已套用！`);
                 }
             });
         }
 
-        // 6. 刪除雲端主題 (需密碼)
-        window.deleteCloudTheme = function(firebaseKey) {
-            if (prompt("🔒 刪除雲端檔案需密碼：") !== adminPassword) return alert("密碼錯誤");
+
+        // ==============================
+        // 2. 媒體影音區 (Media)
+        // ==============================
+
+        // --- 修正版：上傳媒體 (含容量總檢查) ---
+        function uploadMediaOnly() {
+            if (!db) return alert("請先連線");
             
-            db.ref('public_themes/' + firebaseKey).remove()
-              .then(() => {
-                  alert("已刪除");
-                  fetchCloudThemes(); // 重新整理
-              });
+            const bg = localStorage.getItem('rg_bg_image');
+            
+            // 檢查是否有東西可傳
+            if (!bg && !currentMusicData) return alert("目前沒有設定背景圖或音樂，無法上傳。");
+            
+            const name = document.getElementById('media-pack-name').value.trim();
+            if (!name) return alert("請幫這組影音取個名字");
+
+            // ★ 關鍵：檢查總資料量 (Base64 字串長度)
+            // Firebase 免費版建議單次寫入不要超過 5~8MB (約 5,000,000 ~ 8,000,000 字元)
+            let totalSize = 0;
+            if (bg) totalSize += bg.length;
+            if (currentMusicData) totalSize += currentMusicData.length;
+
+            const sizeInMB = (totalSize / 1024 / 1024).toFixed(2);
+            console.log("上傳封包大小:", sizeInMB, "MB");
+
+            // 設定 8MB 為安全上限 (雖然 Firebase 極限更高，但瀏覽器會跑不動)
+            if (totalSize > 8 * 1024 * 1024) {
+                alert(`⛔ 無法上傳！\n\n您的背景圖加音樂總共 ${sizeInMB} MB，超過了雲端資料庫的單次限制 (8MB)。\n\n解決方法：\n1. 換一首短一點的音樂\n2. 重新上傳並裁切背景圖 (裁切會自動壓縮)`);
+                return;
+            }
+            
+            if (prompt(`🔒 上傳媒體包 (${sizeInMB} MB) 需密碼：`) !== adminPassword) return alert("密碼錯誤");
+
+            const mediaId = "media_" + Date.now();
+            const btn = document.querySelector('button[onclick="uploadMediaOnly()"]');
+            const oldTxt = btn.innerText;
+            
+            btn.innerText = `⏳ 上傳中 (${sizeInMB} MB)...`; 
+            btn.disabled = true;
+
+            db.ref('public_media/' + mediaId).set({
+                title: name,
+                bgImage: bg || null,
+                bgMusic: currentMusicData || null,
+                date: new Date().toLocaleString()
+            }).then(() => {
+                alert(`✅ 媒體包「${name}」上傳成功！`);
+                document.getElementById('media-pack-name').value = ""; 
+                fetchCloudMedia();
+            }).catch(e => {
+                alert("❌ 上傳失敗 (網路逾時或檔案被拒絕): " + e.message);
+            }).finally(() => {
+                btn.innerText = oldTxt;
+                btn.disabled = false;
+            });
         }
+
+        // 抓取媒體列表
+        function fetchCloudMedia() {
+            if (!db) return;
+            const div = document.getElementById('cloud-media-list');
+            div.innerHTML = '<div style="padding:5px; text-align:center;">⏳...</div>';
+            
+            db.ref('public_media').once('value').then(snap => {
+                const data = snap.val();
+                div.innerHTML = '';
+                if(!data) { div.innerHTML = '<div style="text-align:center;">無資料</div>'; return; }
+
+                Object.keys(data).forEach(k => {
+                    const m = data[k];
+                    // 判斷包含什麼
+                    let info = [];
+                    if(m.bgImage) info.push("🖼️圖");
+                    if(m.bgMusic) info.push("🎵音");
+
+                    const item = document.createElement('div');
+                    item.className = 'cloud-item';
+                    item.innerHTML = `
+                        <div style="flex:1; overflow:hidden;">
+                            <div style="font-weight:bold; color:#ef6c00;">${m.title}</div>
+                            <div style="font-size:0.7rem; color:#888;">${info.join('+')} | ${m.date.split(' ')[0]}</div>
+                        </div>
+                        <button class="btn-small btn-dl-media" onclick="downloadCloudMedia('${k}')">📥</button>
+                        <button class="btn-small btn-del-cloud" onclick="deleteAny('${k}', 'public_media')">🗑️</button>
+                    `;
+                    div.appendChild(item);
+                });
+            });
+        }
+
+        // 下載並套用媒體
+        window.downloadCloudMedia = function(key) {
+            if(!confirm("確定要套用這組背景與音樂嗎？\n(目前的背景/音樂將被覆蓋)")) return;
+            
+            const btn = event.target;
+            btn.innerText = "⏳";
+
+            db.ref('public_media/' + key).once('value').then(snap => {
+                const val = snap.val();
+                if(val) {
+                    // 套用背景
+                    if(val.bgImage) {
+                        localStorage.setItem('rg_bg_image', val.bgImage);
+                        applyBackground();
+                    }
+                    // 套用音樂
+                    if(val.bgMusic) {
+                        currentMusicData = val.bgMusic;
+                        bgmAudio.src = val.bgMusic;
+                        bgmAudio.load();
+                        document.getElementById('file-status').innerText = "✅ 已載入雲端音樂";
+                    }
+                    alert(`✅ 媒體包「${val.title}」已套用！`);
+                }
+            }).finally(() => {
+                btn.innerText = "📥";
+            });
+        }
+
+        // 通用刪除函式
+        window.deleteAny = function(key, node) {
+            if (prompt("🔒 刪除需密碼：") !== adminPassword) return alert("密碼錯誤");
+            db.ref(node + '/' + key).remove().then(() => {
+                alert("已刪除");
+                if(node === 'public_themes') fetchCloudThemes();
+                else fetchCloudMedia();
+            });
+        }
+
     </script>
 </body>
 </html>
