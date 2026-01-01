@@ -421,9 +421,9 @@
                 </div>
 
                 <div style="display:flex; gap:5px;">
-                    <button class="btn-action" style="background:#48dbfb; flex:1;" onclick="editCurrentTheme()" title="修改目前預覽內容">✏️ 修改</button>
-                    <button class="btn-action" style="background:#ff9f43; flex:1;" onclick="manualSaveData()" title="將目前主題永久存檔">💾 存檔</button>
-                    <button class="btn-action" style="background:#ff7675; flex:1;" onclick="deleteCustomTheme()" title="刪除選取的主題">🗑️ 刪除</button>
+                    <button class="btn-action" style="background:#2ecc71; flex:1;" onclick="startNewTheme()">➕ 新增</button>
+                    <button class="btn-action" style="background:#48dbfb; flex:1;" onclick="editCurrentTheme()">✏️ 修改</button>
+                    <button class="btn-action" style="background:#ff7675; flex:1;" onclick="deleteCustomTheme()">🗑️ 刪除</button>
                 </div>
                 
                 <div id="preview-area">
@@ -1245,9 +1245,10 @@
             tempImg.src = newUrl;
         }
 
-        // --- 修正版：預覽介面 (含 AI 按鈕 + 安全裁切) ---
+        // --- 修正版 1：預覽介面 (按鈕名稱優化) ---
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
+            if (!grid) return; // 防呆
             grid.innerHTML = '';
             
             tempSearchItems.forEach((slot, index) => {
@@ -1256,14 +1257,17 @@
                 const div = document.createElement('div');
                 div.className = 'preview-item';
                 
-                // 取得目前圖片
-                const currentImg = slot.images[slot.currentIndex % slot.images.length] || 'https://placehold.co/200x200?text=NoImg';
+                // 防呆：確保 currentIndex 有值，避免 undefined 導致後續錯誤
+                const cIndex = (slot.currentIndex || 0);
+                const currentImg = (slot.images && slot.images.length > 0) 
+                    ? slot.images[cIndex % slot.images.length] 
+                    : 'https://placehold.co/200x200?text=NoImg';
                 
                 div.innerHTML = `
                     <div class="preview-toolbar">
-                        <button class="btn-mini btn-crop" onclick="prepareCrop(${index})" title="裁切" style="background:orange;">✂️</button>
+                        <button class="btn-mini btn-crop" onclick="console.log('剪刀被按下了'); triggerCrop(${index})" title="裁切" style="background:orange;">✂️</button>
                         
-                        <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="AI 生圖" style="background:#a55eea;">✨</button>
+                        <button class="btn-ai-mini" onclick="generateSingleSlotAI(${index})" title="AI" style="background:#a55eea;">✨</button>
                         
                         <button class="btn-mini btn-swap" onclick="swapPreviewImage(${index})" title="換一張">🔄</button>
                         <button class="btn-mini btn-remove" onclick="removePreviewImage(${index})" title="移除">❌</button>
@@ -1334,7 +1338,26 @@
             document.getElementById('search-status').innerText = `✏️ 正在編輯: ${data.title}`;
         }
 
-        // --- 修正版 5：確認套用 (只暫存，不自動寫入硬碟) ---
+        // --- 新增：開始製作新主題 (清空狀態) ---
+        function startNewTheme() {
+            // 1. 清空暫存區
+            tempSearchItems = [];
+            
+            // 2. 清空標題欄
+            document.getElementById('custom-theme-title').value = "";
+            
+            // 3. ★ 關鍵：把選單重置回「內建主題」(例如 flags)
+            // 這樣 confirmSearchTheme 就會知道這不是在編輯舊的，而是要創新的
+            document.getElementById('theme-select').value = "flags"; 
+            
+            // 4. 顯示預覽區
+            document.getElementById('preview-area').style.display = 'block';
+            renderPreviewGrid();
+            
+            document.getElementById('search-status').innerText = "🆕 已切換為新主題模式，請開始搜尋";
+        }
+
+        // --- 修正版：確認套用 (自動儲存 + 支援多主題) ---
         function confirmSearchTheme() {
             const activeItems = tempSearchItems.filter(item => !item.deleted);
             if (activeItems.length === 0) {
@@ -1342,40 +1365,54 @@
                 return;
             }
 
-            // 同步輸入框
-            const finalImages = activeItems.map((slot, idx) => {
-                return {
-                    url: slot.images[slot.currentIndex % slot.images.length],
-                    label: slot.label
-                };
+            // 整理資料
+            const finalImages = activeItems.map((slot) => {
+                // 這裡要支援文字卡和圖片卡
+                if (slot.isTextMode) {
+                    return { isTextMode: true, label: slot.label, bgColor: slot.bgColor };
+                } else {
+                    return { 
+                        isTextMode: false,
+                        label: slot.label, 
+                        url: slot.images[slot.currentIndex % slot.images.length] 
+                    };
+                }
             });
 
+            // 取得標題
             const titleInput = document.getElementById('custom-theme-title').value.trim();
             const firstKeyword = activeItems[0].label;
             const themeTitle = titleInput || `🔍 自訂: ${firstKeyword}...`;
 
-            // 判斷是新增還是覆蓋
-            let themeKey = "search_" + Date.now();
+            // ★ 判斷邏輯：
+            // 如果選單選的是「既有的自訂主題」，那就是「覆蓋 (修改)」
+            // 如果選單選的是「內建主題」或剛按過「新增」，那就是「建立新主題」
+            let themeKey = "search_" + Date.now(); // 預設產生新 ID
             const currentSelect = document.getElementById('theme-select').value;
+            
             if (currentSelect.startsWith('search_') && searchData[currentSelect]) {
+                 // 覆蓋舊的
                  themeKey = currentSelect;
             }
 
-            // 更新記憶體中的資料
+            // 更新資料
             searchData[themeKey] = {
                 images: finalImages,
                 title: themeTitle
             };
 
+            // ★ 自動存檔 (不再只是暫存)
+            saveSearchData(); 
+
+            // 更新介面
             updateThemeSelect();
             document.getElementById('theme-select').value = themeKey;
             
-            // ★★★ 注意：這裡移除了 saveSearchData(); ★★★
-            // 現在這裡只是「暫存」，重新整理後會消失，除非你手動按存檔
+            // 儲存現在選的是這一個
             saveSettings(); 
             
             document.getElementById('preview-area').style.display = 'none'; 
-            document.getElementById('search-status').innerText = `✅ 已暫存: ${themeTitle} (未永久儲存)`;
+            alert(`✅ 主題「${themeTitle}」已儲存！`);
         }
 
         // --- 2. 資料夾 & 音樂 ---
@@ -1612,12 +1649,25 @@
             document.getElementById('cropper-modal').style.display = 'none';
         }
 
-        // --- 1. 安全裁切準備 (中繼站) ---
-        function prepareCrop(index) {
+        // --- 修正版 2：裁切準備 (安全中繼站) ---
+        function triggerCrop(index) {
+            console.log("準備裁切 Index:", index); // F12 可見
+            
             const slot = tempSearchItems[index];
-            if (!slot || slot.images.length === 0) return;
-            // 從記憶體拿網址，這樣絕對不會因為網址有怪符號而壞掉
-            const url = slot.images[slot.currentIndex % slot.images.length];
+            if (!slot || !slot.images || slot.images.length === 0) {
+                alert("❌ 錯誤：找不到圖片資料");
+                return;
+            }
+            
+            const cIndex = slot.currentIndex || 0;
+            const url = slot.images[cIndex % slot.images.length];
+            
+            // ★ 關鍵防呆：如果網址無效，程式會在這裡停止並通知您，而不是當機
+            if (!url) {
+                alert("❌ 錯誤：圖片網址無效 (undefined)");
+                return;
+            }
+            
             startCropperForWiki(url, index);
         }
 
@@ -1633,73 +1683,83 @@
             startCropperForWiki(currentImgUrl, index);
         }
 
-        // --- 終極修正版：裁切啟動器 (三段式救援 + HTTPS 強制) ---
+        // --- 修正版 3：裁切啟動器 (穩健下載版) ---
         async function startCropperForWiki(imgUrl, index) {
             const statusDiv = document.getElementById('search-status');
-            statusDiv.innerText = "⏳ 正在下載圖片...";
-            
-            // 1. 強制轉為 HTTPS (GitHub Pages 必須！)
+            if(statusDiv) statusDiv.innerText = "⏳ 正在分析圖片...";
+            console.log("開始下載圖片:", imgUrl);
+
+            // 1. 網址防呆處理
+            if (typeof imgUrl !== 'string') {
+                alert("❌ 圖片格式錯誤，無法裁切");
+                return;
+            }
+
+            // 強制轉為 HTTPS (GitHub Pages 安全要求)
             if (imgUrl.startsWith('http:')) {
                 imgUrl = imgUrl.replace('http:', 'https:');
             }
 
-            // 下載小幫手 (將圖片轉為 Blob)
+            // 定義下載工具
             const tryFetch = async (url) => {
                 const res = await fetch(url);
-                if (!res.ok) throw new Error("Fetch failed");
+                if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
                 return await res.blob();
             };
 
             try {
                 let blob = null;
 
-                // A計畫：嘗試直連 (速度最快)
+                // 步驟 A: 直連 (最快)
                 try {
                     blob = await tryFetch(imgUrl);
+                    console.log("直連成功");
                 } catch (e1) {
-                    // B計畫：Proxy A (AllOrigins)
+                    // 步驟 B: Proxy 1 (AllOrigins)
                     try {
-                        console.warn("直連失敗，嘗試 Proxy A...");
-                        statusDiv.innerText = "⏳ 轉接線路 A...";
+                        console.warn("直連失敗，嘗試 Proxy 1...");
+                        if(statusDiv) statusDiv.innerText = "⏳ 嘗試線路 1...";
                         const proxyA = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgUrl)}`;
                         blob = await tryFetch(proxyA);
                     } catch (e2) {
-                        // C計畫：Proxy B (CorsProxy)
-                        console.warn("Proxy A 失敗，嘗試 Proxy B...");
-                        statusDiv.innerText = "⏳ 轉接線路 B...";
+                        // 步驟 C: Proxy 2 (CorsProxy)
+                        console.warn("Proxy 1 失敗，嘗試 Proxy 2...");
+                        if(statusDiv) statusDiv.innerText = "⏳ 嘗試線路 2...";
                         const proxyB = `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`;
                         blob = await tryFetch(proxyB);
                     }
                 }
 
-                if (!blob) throw new Error("All methods failed");
+                if (!blob) throw new Error("所有線路均下載失敗");
 
-                // 成功取得檔案！
+                // 成功：啟動介面
                 const objectUrl = URL.createObjectURL(blob);
-
+                
+                // 設定全域變數
                 cropTargetType = 'card';
                 cropTargetIndex = index;
 
                 const img = document.getElementById('cropper-img');
-                // 清除舊事件
+                const modal = document.getElementById('cropper-modal');
+                const box = document.getElementById('crop-box');
+
+                // 清除舊事件避免干擾
                 img.onload = null;
-                img.onerror = null;
-                
                 img.src = objectUrl;
                 
                 img.onload = () => {
-                    document.getElementById('cropper-modal').style.display = 'flex';
-                    document.getElementById('crop-box').style.display = 'none';
+                    console.log("圖片載入完成，開啟視窗");
+                    modal.style.display = 'flex';
+                    box.style.display = 'none';
+                    // 重置裁切框狀態
                     cropState = { startX: 0, startY: 0, isDragging: false, rect: {} };
-                    statusDiv.innerText = "✂️ 請拖曳裁切範圍";
+                    if(statusDiv) statusDiv.innerText = "✂️ 請拖曳裁切範圍";
                 };
 
             } catch (error) {
-                console.error(error);
-                alert(`❌ 圖片下載失敗！\n\nGitHub 安全性限制較高，建議您：\n1. 對圖片按右鍵「另存新檔」\n2. 使用下方「自訂遊戲背景」上傳該圖\n3. 裁切後再到這裡使用。`);
-                statusDiv.innerText = "";
-                // 雖然不能切，還是更新上去
-                finishCardUpdate(imgUrl, index);
+                console.error("下載流程錯誤:", error);
+                alert(`❌ 圖片無法下載！\n\n這張圖的網站安全性較高 (CORS Block)。\n建議方案：\n1. 對圖片按右鍵「另存新檔」\n2. 使用下方的「自訂遊戲背景」上傳該圖來裁切。`);
+                if(statusDiv) statusDiv.innerText = "";
             }
         }
 
@@ -1759,29 +1819,29 @@
             cropState.isDragging = false;
         }
 
-        // --- 修正版：確認裁切 (支援 背景/卡片 雙模式) ---
+        // --- 修正版：確認裁切 (獨立防呆版) ---
         async function confirmCrop() {
             const img = document.getElementById('cropper-img');
             const rect = cropState.rect;
 
+            // 1. 防呆檢查：有沒有拉框框？
             if (!rect.width || !rect.height) {
                 alert("請先拖曳滑鼠框選範圍！");
                 return;
             }
 
-            // 計算比例
-            const scaleX = img.naturalWidth / img.offsetWidth;
-            const scaleY = img.naturalHeight / img.offsetHeight;
+            try {
+                // 2. 計算裁切參數
+                const scaleX = img.naturalWidth / img.offsetWidth;
+                const scaleY = img.naturalHeight / img.offsetHeight;
 
-            // 內部函式：執行裁切並回傳 Base64
-            const doCrop = (maxSide, quality) => {
                 const canvas = document.createElement('canvas');
                 let targetW = rect.width * scaleX;
                 let targetH = rect.height * scaleY;
 
-                // 縮放限制 (避免檔案過大)
-                if (targetW > maxSide || targetH > maxSide) {
-                    const ratio = Math.min(maxSide / targetW, maxSide / targetH);
+                // 縮放限制 (避免圖片過大卡頓，限制在 1000px)
+                if (targetW > 1000 || targetH > 1000) {
+                    const ratio = Math.min(1000 / targetW, 1000 / targetH);
                     targetW *= ratio;
                     targetH *= ratio;
                 }
@@ -1790,6 +1850,7 @@
                 canvas.height = targetH;
                 const ctx = canvas.getContext('2d');
 
+                // 執行裁切
                 ctx.drawImage(
                     img, 
                     rect.left * scaleX, rect.top * scaleY, 
@@ -1798,36 +1859,38 @@
                     canvas.width, canvas.height
                 );
 
-                return canvas.toDataURL('image/jpeg', quality);
-            };
+                // 轉出圖片 (Base64)
+                const finalData = canvas.toDataURL('image/jpeg', 0.85);
 
-            try {
-                // 1. 產生裁切後的圖片 (卡片不用太大，800px夠了)
-                const finalData = doCrop(1000, 0.8);
-
-                // 2. 判斷要存去哪裡
+                // 3. 判斷是「存背景」還是「存卡片」
                 if (cropTargetType === 'bg') {
                     // --- 存背景 ---
                     try {
-                        localStorage.removeItem('rg_bg_image');
                         localStorage.setItem('rg_bg_image', finalData);
-                        applyBackground();
-                        document.getElementById('search-status').innerText = "✅ 背景設定完成";
+                        applyBackground(); // 立即套用
                     } catch (e) {
-                        alert("背景圖太大存不下，請試著切小一點。");
+                        alert("背景圖檔過大，無法儲存 (Local Storage Full)");
                     }
                 } else {
-                    // --- 存卡片 ---
-                    // 呼叫更新函式，把這張 Base64 圖塞進去
-                    finishCardUpdate(finalData, cropTargetIndex);
-                    document.getElementById('search-status').innerText = "✅ 圖片裁切完成";
+                    // --- 存卡片 (直接更新資料，不依賴 finishCardUpdate) ---
+                    if (tempSearchItems[cropTargetIndex]) {
+                        // 把新圖放在陣列第一位 (保留舊圖當備份)
+                        const oldImages = tempSearchItems[cropTargetIndex].images || [];
+                        tempSearchItems[cropTargetIndex].images = [finalData, ...oldImages];
+                        tempSearchItems[cropTargetIndex].currentIndex = 0;
+                        
+                        // 重新渲染預覽區
+                        renderPreviewGrid();
+                    }
                 }
 
+                // 4. 關閉視窗
                 closeCropper();
 
             } catch (e) {
-                console.error(e);
-                alert("裁切發生錯誤");
+                console.error("裁切錯誤詳細資訊:", e);
+                // 這裡不再 alert，因為如果圖片有更新成功，就不該嚇使用者
+                // 只有當真的嚴重錯誤時 (canvas 產不出來) 才會被這裡捕捉
             }
         }
 
@@ -2012,6 +2075,7 @@
             return items;
         }
 
+        // --- 修正版：遊戲主迴圈 (runGameLoop) ---
         async function runGameLoop() {
             try {
                 bgmAudio.playbackRate = gameState.playbackRate;
@@ -2035,8 +2099,10 @@
                     grid.innerHTML = '';
                     let items = [];
 
+                    // ... (省略選題邏輯，保持你原本的即可) ...
+                    // 如果你這段有改過，請保留原本的邏輯，重點是下面的 forEach
                     if (gameState.currentRunTheme === 'random_mixed') {
-                        items = getMixedItems();
+                        items = getMixedItems(); // 假設你有這函式
                     } else if (gameState.currentRunTheme === 'random_round') {
                         const allT = getAllThemes();
                         const t = allT[Math.floor(Math.random() * allT.length)];
@@ -2051,6 +2117,7 @@
                     if (gameState.hintMode === 'always') showHint = true;
                     if (gameState.hintMode === 'first' && gameState.round === 1) showHint = true;
 
+                    // ★★★ 重點修改在這裡 ★★★
                     items.forEach(obj => {
                         const card = document.createElement('div');
                         card.className = 'card';
@@ -2059,9 +2126,20 @@
                         const content = document.createElement('div');
                         content.className = 'card-content';
 
-                        const isUrl = typeof obj.content === 'string' && (obj.content.startsWith('http') || obj.content.startsWith('blob:'));
+                        // ★ 關鍵：加入 blob: 和 data: 的判斷
+                        const isUrl = typeof obj.content === 'string' && (
+                            obj.content.startsWith('http') || 
+                            obj.content.startsWith('blob:') || 
+                            obj.content.startsWith('data:')
+                        );
                         
-                        if (isUrl) {
+                        if (obj.isTextMode) {
+                             // 純文字卡
+                             card.classList.add('text-only-mode');
+                             content.innerHTML = `<div style="font-size:3rem; color:#333;">${obj.content}</div>`;
+                             card.style.backgroundColor = obj.bgColor || '#fff';
+                        } else if (isUrl) {
+                            // 圖片卡 (包含裁切後的 blob)
                             card.classList.add('contain-img');
                             content.innerHTML = `<img src="${obj.content}" onerror="this.src='https://placehold.co/200x200?text=Error'">`;
                         } else if (obj.theme === 'colors') {
@@ -2069,6 +2147,7 @@
                             card.style.backgroundColor = obj.content;
                             if(obj.content === '#ffffff') card.style.borderColor = '#ddd';
                         } else {
+                            // 一般文字
                             content.innerText = obj.content;
                             if(obj.theme === 'numbers') card.classList.add('number-mode');
                             if(obj.theme === 'math') card.classList.add('math-mode');
@@ -2083,6 +2162,7 @@
                         card.appendChild(label);
                         grid.appendChild(card);
                     });
+                    // ★★★ 修改結束 ★★★
 
                     if (gameState.introSeconds > 0) await wait(gameState.introSeconds * 1000);
 
@@ -2105,6 +2185,7 @@
         }
 
         function showEndScreen() {
+            // ... (前面的程式碼保留) ...
             stopRecording();
             bgmAudio.pause();
             document.getElementById('game-screen').style.display = 'none';
@@ -2115,13 +2196,10 @@
             historyDiv.innerHTML = '';
             
             gameState.history.forEach(h => {
+                // ... (建立標題的程式碼保留) ...
                 const roundBlock = document.createElement('div');
                 roundBlock.className = 'history-round';
-                
-                const title = document.createElement('div');
-                title.className = 'history-title';
-                title.innerText = `Round ${h.round}`;
-                roundBlock.appendChild(title);
+                roundBlock.innerHTML = `<div class="history-title">Round ${h.round}</div>`;
 
                 const grid = document.createElement('div');
                 grid.className = 'history-grid';
@@ -2131,12 +2209,21 @@
                     cell.className = 'history-item';
                     
                     let visual = '';
-                    if (item.theme === 'colors') {
+                    // ★ 關鍵修改：這裡也要判斷 blob: 和 data:
+                    const isUrl = typeof item.content === 'string' && (
+                        item.content.startsWith('http') || 
+                        item.content.startsWith('blob:') || 
+                        item.content.startsWith('data:')
+                    );
+
+                    if (item.isTextMode) {
+                        visual = `<div class="history-thumb" style="background:${item.bgColor}; display:flex; align-items:center; justify-content:center; font-weight:bold;">${item.content}</div>`;
+                    } else if (item.theme === 'colors') {
                         visual = `<div class="history-thumb" style="background:${item.content};"></div>`;
-                    } else if (item.content.startsWith && (item.content.startsWith('http') || item.content.startsWith('blob:'))) {
+                    } else if (isUrl) {
                         visual = `<img class="history-thumb" src="${item.content}">`;
                     } else {
-                        visual = `<div class="history-thumb">${item.content}</div>`;
+                        visual = `<div class="history-thumb" style="display:flex; align-items:center; justify-content:center;">${item.content}</div>`;
                     }
                     
                     cell.innerHTML = `${visual}<div class="history-name">${item.label}</div>`;
