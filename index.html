@@ -1490,18 +1490,16 @@
             document.getElementById('upload-status').innerText = `✅ 成功載入 ${Object.keys(customData).length} 個主題，共 ${count} 張圖片`;
         });
 
-        // --- 修正版：音樂檔案讀取 (加入容量限制) ---
+        // --- 修正版：選取音樂 (讀取後自動存到硬碟) ---
         document.getElementById('music-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             
-            // ★ 安全檢查：限制音樂檔案不能超過 2.5 MB
-            // Firebase Realtime DB 不適合存大檔案，太大会直接卡死或失敗
-            const maxSize = 2.5 * 1024 * 1024; // 2.5MB
-            
+            // 安全檢查：限制 2.5 MB (以免 LocalStorage 爆掉)
+            const maxSize = 2.5 * 1024 * 1024; 
             if (file.size > maxSize) {
-                alert(`⚠️ 這首音樂太大了 (${(file.size/1024/1024).toFixed(1)} MB)！\n\n為了確保能上傳雲端，請使用 2.5MB 以下的檔案。\n(建議使用 mp3 剪輯工具，只剪副歌部分)`);
-                this.value = ''; // 清空選擇
+                alert(`⚠️ 這首音樂太大了 (${(file.size/1024/1024).toFixed(1)} MB)！\nLocalStorage 容量有限，請使用 2.5MB 以下的檔案。`);
+                this.value = ''; 
                 return;
             }
 
@@ -1509,13 +1507,24 @@
 
             const reader = new FileReader();
             reader.onload = function(evt) {
-                bgmAudio.src = evt.target.result;
+                const musicData = evt.target.result;
+
+                // 1. 設定給播放器
+                bgmAudio.src = musicData;
                 bgmAudio.load();
                 
-                // 存入暫存變數
-                currentMusicData = evt.target.result;
+                // 2. 存入記憶體 (上傳用)
+                currentMusicData = musicData;
                 
-                document.getElementById('file-status').innerText = `✅ 音樂已載入 (${(file.size/1024/1024).toFixed(1)} MB)`;
+                // 3. ★ 關鍵新增：存入硬碟 (重整後還會在)
+                try {
+                    localStorage.setItem('rg_bg_music', musicData);
+                    localStorage.setItem('rg_bg_music_name', file.name); // 順便記住檔名
+                    document.getElementById('file-status').innerText = `✅ 已儲存: ${file.name}`;
+                } catch (e) {
+                    console.error(e);
+                    alert("⚠️ 音樂可以播放，但無法儲存！\n原因：瀏覽器儲存空間已滿 (通常上限是 5MB)。\n建議：刪除一些舊的背景圖或使用更小的音樂檔。");
+                }
             };
             reader.onerror = function() { alert("讀取失敗"); };
             reader.readAsDataURL(file);
@@ -1985,13 +1994,29 @@
             }
         }
 
+        // --- 網頁載入初始化 ---
         window.addEventListener('load', async () => {
-            loadSearchData(); // ★ 加入這行：讀取自訂主題
+            loadSearchData();
             loadSettings();
-            applyBackground();
+            applyBackground(); // 載入背景圖
             updateThemeSelect();
-            // ★ 改成呼叫這個新函式
-            initFirebaseAuto();
+            initFirebaseAuto(); // 自動連線 Firebase
+            updateUploadSelect();
+
+            // ★ 新增：載入上次儲存的音樂
+            const savedMusic = localStorage.getItem('rg_bg_music');
+            const savedName = localStorage.getItem('rg_bg_music_name');
+            
+            if (savedMusic) {
+                bgmAudio.src = savedMusic;
+                currentMusicData = savedMusic; // 恢復上傳用的資料
+                // 雖然瀏覽器通常不允許自動播放，但我們準備好了
+                bgmAudio.load(); 
+                
+                const status = document.getElementById('file-status');
+                if(status) status.innerText = `✅ 已載入: ${savedName || '上次的音樂'}`;
+                console.log("已恢復背景音樂");
+            }
         });
 
         // --- 5. 遊戲核心 ---
