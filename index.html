@@ -547,12 +547,10 @@
             <div class="control-group" style="border: 2px solid #2196f3; background: #e3f2fd;">
                 <label style="color:#1565c0;">☁️ 雲端主題庫 (Firebase)</label>
                 
-                <div style="margin-bottom: 10px;">
-                    <div id="firebase-status" style="font-weight:bold; color:red; font-size:0.9rem; margin-bottom:5px;">🔴 未連線</div>
-                    <button class="btn-action" onclick="toggleDbConfig()" style="background:#607d8b; width:100%;">⚙️ 設定資料庫金鑰</button>
-                    <div id="db-config-area" style="display:none; margin-top:5px;">
-                        <textarea id="firebase-config-input" rows="3" placeholder='貼上 Firebase Config JSON' style="width:100%; font-size:0.8rem;"></textarea>
-                        <button class="btn-primary" style="width:100%; font-size:0.9rem; margin-top:3px;" onclick="connectFirebase()">🔗 連線</button>
+                <div style="margin-bottom: 10px; padding-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:bold; color:#1565c0;">連線狀態：</span>
+                        <span id="firebase-status" style="font-weight:bold; color:red;">⏳ 連線中...</span>
                     </div>
                 </div>
 
@@ -1967,9 +1965,8 @@
             loadSettings();
             applyBackground();
             updateThemeSelect();
-            // ★ 加入這行
-            autoConnectFirebase();
-            updateUploadSelect(); // 初始化上傳選單
+            // ★ 改成呼叫這個新函式
+            initFirebaseAuto();
         });
 
         // --- 5. 遊戲核心 ---
@@ -2321,58 +2318,47 @@
             document.getElementById('home-screen').style.display = 'flex';
         }
 
-        // --- Firebase 雲端主題庫功能 (V13 新增) ---
+        // --- Firebase 雲端設定 (已寫死，自動連線) ---
         let db = null;
+        // ★★★ 你的專屬 Config (已填入) ★★★
+        const firebaseConfig = {
+            apiKey: "AIzaSyCZYi7QnXngx0FxoYY4vjJm0BeN1tYhn18",
+            authDomain: "rythm-game-v9.firebaseapp.com",
+            databaseURL: "https://rythm-game-v9-default-rtdb.firebaseio.com",
+            projectId: "rythm-game-v9",
+            storageBucket: "rythm-game-v9.firebasestorage.app",
+            messagingSenderId: "597761558836",
+            appId: "1:597761558836:web:e232dcd52f4946b8b1bd61",
+            measurementId: "G-NT26BCBJRP"
+        };
 
-        function toggleDbConfig() {
-            const el = document.getElementById('db-config-area');
-            el.style.display = el.style.display === 'none' ? 'block' : 'none';
-        }
-
-        // --- 修正版：連線 Firebase (支援寬容格式) ---
-        function connectFirebase() {
-            const configStr = document.getElementById('firebase-config-input').value.trim();
-            if (!configStr) return alert("請輸入 Config");
-            
+        // 網頁一打開就自動連線
+        function initFirebaseAuto() {
             try {
-                // ★ 關鍵修改：先做字串清理
-                let cleanStr = configStr;
-                
-                // 1. 如果使用者複製到 'const firebaseConfig = '，幫忙去掉前面
-                if (cleanStr.includes('=')) {
-                    cleanStr = cleanStr.split('=')[1];
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
                 }
-
-                // 2. 改用 new Function 來解析 (比 JSON.parse 更強大)
-                // 這樣就算 key 沒有引號 (apiKey: ...) 或結尾有分號 (;)，也能正確讀取
-                const config = new Function("return " + cleanStr)();
-
-                // 3. 執行連線
-                if (!firebase.apps.length) firebase.initializeApp(config);
                 db = firebase.database();
+                console.log("🔥 Firebase 自動連線成功！");
                 
-                // 存檔並更新介面
-                localStorage.setItem('rg_firebase_config', configStr);
+                // 更新介面燈號
+                const status = document.getElementById('firebase-status');
+                if(status) {
+                    status.innerText = "🟢 已自動連線";
+                    status.style.color = "green";
+                }
                 
-                document.getElementById('firebase-status').innerText = "🟢 已連線";
-                document.getElementById('firebase-status').style.color = "green";
-                document.getElementById('db-config-area').style.display = 'none';
-                
-                updateUploadSelect(); // 更新可上傳列表
-                alert("✅ 連線成功！");
+                // 隱藏手動輸入區 (因為已經不需要了)
+                const configArea = document.getElementById('manual-config-section');
+                if(configArea) configArea.style.display = 'none';
 
+                // 更新上傳列表
+                updateUploadSelect();
+                
             } catch (e) {
-                console.error(e);
-                alert("連線失敗！請確認你複製的是大括號 { ... } 的內容\n錯誤訊息: " + e.message);
-            }
-        }
-
-        // 自動嘗試連線 (開啟網頁時)
-        function autoConnectFirebase() {
-            const savedConfig = localStorage.getItem('rg_firebase_config');
-            if (savedConfig) {
-                document.getElementById('firebase-config-input').value = savedConfig;
-                connectFirebase();
+                console.error("Firebase 連線錯誤", e);
+                const status = document.getElementById('firebase-status');
+                if(status) status.innerText = "🔴 連線失敗 (請看 Console)";
             }
         }
 
