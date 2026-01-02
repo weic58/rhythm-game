@@ -932,21 +932,27 @@
         // --- 單格搜尋 (復原) ---
         // --- 修正版：單格搜尋 (鎖定中文維基，支援英文查找) ---
         // --- 修正版：單格搜尋 (強力挖圖 + Proxy + 換圖修復) ---
+        // --- 修正版：單格搜尋 (改用 ID 抓取元素，解決沒反應的 Bug) ---
         async function updateSingleSlot(index) {
             const inputEl = document.getElementById(`input-${index}`);
+            if(!inputEl) return; // 防呆
+            
             const userKeyword = inputEl.value.trim(); 
             if (!userKeyword) return alert("請輸入關鍵字");
             
             tempSearchItems[index].label = userKeyword;
-            const source = document.getElementById('search-source').value;
+            const sourceEl = document.getElementById('search-source');
+            const source = sourceEl ? sourceEl.value : 'wiki'; // 防呆
             
-            const grid = document.getElementById('preview-grid');
-            const slotDiv = grid.children[index];
-            if(!slotDiv) return;
+            // ★★★ 關鍵修正：直接用 ID 抓取格子，不再用 children[index] 猜測 ★★★
+            const slotDiv = document.getElementById(`preview-slot-${index}`);
+            if(!slotDiv) return; // 找不到格子就結束，不會報錯
 
+            // 清除舊遮罩
             const oldOverlay = slotDiv.querySelector('.selection-overlay');
             if(oldOverlay) oldOverlay.remove();
 
+            // 建立新遮罩
             const loadingOverlay = document.createElement('div');
             loadingOverlay.className = 'selection-overlay';
             loadingOverlay.style.cssText = `
@@ -982,40 +988,26 @@
                 }
             };
 
-            // ★ 強力挖圖邏輯 (針對鋼鐵人3這類條目)
+            // 深層挖圖
             const fetchBestImageForTitle = async (exactTitle) => {
-                loadingOverlay.innerHTML = `<div style="margin:auto; color:#666;">📸 正在挖掘「${exactTitle}」...</div>`;
-                
-                // 鎖定中文維基 (除非是 Commons)
-                const baseUrl = (source === 'wiki')
-                    ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' 
-                    : 'https://commons.wikimedia.org/w/api.php';
+                loadingOverlay.innerHTML = '<div style="margin:auto; color:#666;">📸 正在挖掘圖片...</div>';
+                const baseUrl = (source === 'wiki') ? 'https://zh.wikipedia.org/w/api.php?variant=zh-tw' : 'https://commons.wikimedia.org/w/api.php';
 
                 try {
                     let imgUrl = null;
-
-                    // 策略 1: 優先嘗試抓頁面內 "imageinfo" (通常海報藏在這裡)
                     if (source === 'wiki') {
-                        // generator=images 列出頁面連結的所有圖片
                         const targetUrl = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&generator=images&gimlimit=10&prop=imageinfo&iiprop=url&format=json&origin=*`;
                         const data = await tryFetchJson(targetUrl);
-                        
                         if (data.query && data.query.pages) {
                             const pages = Object.values(data.query.pages);
-                            // 過濾雜圖 (SVG, Icon)
                             const validImgs = pages.filter(p => {
                                 if(!p.imageinfo || !p.imageinfo[0]) return false;
                                 const u = p.imageinfo[0].url;
                                 return !u.endsWith('.svg') && !u.includes('Icon') && !u.includes('Ambox');
                             });
-                            // 如果有找到圖，取第一張 (通常是 Infobox 裡的圖)
-                            if(validImgs.length > 0) {
-                                imgUrl = validImgs[0].imageinfo[0].url;
-                            }
+                            if(validImgs.length > 0) imgUrl = validImgs[0].imageinfo[0].url;
                         }
                     }
-
-                    // 策略 2: 如果沒找到，才用標準的 Thumbnail
                     if (!imgUrl) {
                         const targetUrl = `${baseUrl}&action=query&titles=${encodeURIComponent(exactTitle)}&prop=pageimages&pithumbsize=600&format=json&origin=*`;
                         const data = await tryFetchJson(targetUrl);
@@ -1024,12 +1016,10 @@
                             if (p.thumbnail) imgUrl = p.thumbnail.source;
                         }
                     }
-
                     return imgUrl;
-                } catch (e) { console.error(e); return null; }
+                } catch (e) { return null; }
             };
 
-            // 渲染列表
             const processData = (data) => {
                 loadingOverlay.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:5px;">
@@ -1038,7 +1028,6 @@
                     </div>
                     <div class="result-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:4px;"></div>
                 `;
-                
                 const listDiv = loadingOverlay.querySelector('.result-list');
                 let foundCount = 0;
 
@@ -1050,13 +1039,9 @@
                         let title = page.title;
                         if (source !== 'wiki') title = title.replace(/^File:/, '').replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
 
-                        // 列表縮圖 (沒有就用圖示)
                         let thumbUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Text_document_with_red_question_mark.svg/50px-Text_document_with_red_question_mark.svg.png';
-                        if (source === 'wiki') {
-                            if (page.thumbnail) thumbUrl = page.thumbnail.source;
-                        } else {
-                            if (page.imageinfo && page.imageinfo[0]) thumbUrl = page.imageinfo[0].thumburl || page.imageinfo[0].url;
-                        }
+                        if (source === 'wiki') { if (page.thumbnail) thumbUrl = page.thumbnail.source; } 
+                        else { if (page.imageinfo && page.imageinfo[0]) thumbUrl = page.imageinfo[0].thumburl || page.imageinfo[0].url; }
 
                         foundCount++;
                         const item = document.createElement('div');
@@ -1069,46 +1054,33 @@
                             <div style="font-size:0.8rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${title}</div>
                         `;
                         
-                        // ★ 點擊事件
                         item.onclick = async () => {
                             let finalImg = null;
-                            
-                            // 無論列表有沒有圖，如果是 wiki 模式，都嘗試深層挖掘 (為了抓到海報)
-                            if (source === 'wiki') {
-                                finalImg = await fetchBestImageForTitle(page.title);
-                            }
-                            
-                            // 如果深層挖掘失敗，但列表有圖，就用列表的圖
-                            if (!finalImg && !thumbUrl.includes('Text_document')) {
-                                finalImg = thumbUrl;
-                            }
+                            if (source === 'wiki') finalImg = await fetchBestImageForTitle(page.title);
+                            if (!finalImg && !thumbUrl.includes('Text_document')) finalImg = thumbUrl;
 
                             if (finalImg) {
                                 tempSearchItems[index].images = [finalImg];
                                 tempSearchItems[index].currentIndex = 0;
                                 renderPreviewGrid(); 
                             } else {
-                                alert(`抱歉，條目「${title}」裡面找不到適合的圖片...`);
+                                alert(`抱歉，條目「${title}」找不到適合的圖片...`);
                                 renderPreviewGrid(); 
                             }
                         };
                         listDiv.appendChild(item);
                     });
                 }
-
                 if (foundCount === 0) {
                     loadingOverlay.innerHTML = `<div style="text-align:center; padding:20px; color:red;">找不到「${userKeyword}」<br><button class="btn-small" style="background:#777; margin-top:10px;" onclick="this.closest('.selection-overlay').remove()">關閉</button></div>`;
                 }
             };
 
-            // 主程式
             let targetUrl = '';
             if (source === 'wiki') {
-                const baseUrl = 'https://zh.wikipedia.org/w/api.php?variant=zh-tw';
-                targetUrl = `${baseUrl}&action=query&generator=prefixsearch&gpssearch=${encodeURIComponent(userKeyword)}&gpslimit=10&prop=pageimages|info&pithumbsize=100&format=json&origin=*`;
+                targetUrl = `https://zh.wikipedia.org/w/api.php?variant=zh-tw&action=query&generator=prefixsearch&gpssearch=${encodeURIComponent(userKeyword)}&gpslimit=10&prop=pageimages|info&pithumbsize=100&format=json&origin=*`;
             } else {
-                const cleanKw = encodeURIComponent(userKeyword);
-                targetUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${cleanKw}%20filetype:bitmap&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url&iiurlwidth=100&format=json&origin=*`;
+                targetUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(userKeyword)}%20filetype:bitmap&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url&iiurlwidth=100&format=json&origin=*`;
             }
 
             try {
@@ -1120,15 +1092,24 @@
             }
         }
 
+        // --- 修正版：渲染預覽格 (加上 ID 標籤，防止順序錯亂) ---
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             if(!grid) return;
             grid.innerHTML = '';
+            
             tempSearchItems.forEach((slot, idx) => {
                 if(slot.deleted) return;
+                
+                // 確保有圖片，沒圖就給空字串
                 const img = (slot.images && slot.images.length>0) ? slot.images[(slot.currentIndex||0)%slot.images.length] : '';
+                
                 const div = document.createElement('div');
                 div.className = 'preview-item';
+                
+                // ★★★ 關鍵修正：給每一格一個固定的 ID (preview-slot-編號) ★★★
+                div.id = `preview-slot-${idx}`; 
+                
                 div.innerHTML = `
                     <div class="preview-toolbar">
                         <button class="btn-mini" onclick="generateSingleSlotAI(${idx})" title="AI生圖" style="background:#a55eea;">✨</button>
@@ -1809,4 +1790,3 @@
     </script>
 </body>
 </html>
-
