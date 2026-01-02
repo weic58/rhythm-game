@@ -1725,11 +1725,32 @@
             } catch(e) { if(e.message!=='Abort') console.error(e); }
         }
 
+        // --- 修正版：等待函式 (支援暫停與中斷) ---
         function wait(ms) {
-            return new Promise((res, rej) => {
-                const id = setTimeout(res, ms);
-                gameState.abortController.signal.addEventListener('abort', ()=>{ clearTimeout(id); rej(new Error('Abort')); });
-                if(gameState.isPaused) { }
+            return new Promise((resolve, reject) => {
+                let elapsed = 0;
+                const checkInterval = 50; // 每 50 毫秒檢查一次狀態
+                
+                const timerId = setInterval(() => {
+                    // 1. 如果按下首頁鍵 (Abort)，直接停止並報錯退出
+                    if (gameState.abortController.signal.aborted) {
+                        clearInterval(timerId);
+                        reject(new Error('Abort'));
+                        return;
+                    }
+                    
+                    // 2. 如果是暫停狀態，就「空轉」，不增加經過時間
+                    if (gameState.isPaused) {
+                        return; 
+                    }
+                    
+                    // 3. 正常計時
+                    elapsed += checkInterval;
+                    if (elapsed >= ms) {
+                        clearInterval(timerId);
+                        resolve(); // 時間到，繼續往下執行
+                    }
+                }, checkInterval);
             });
         }
         
@@ -1790,3 +1811,4 @@
     </script>
 </body>
 </html>
+
