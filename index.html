@@ -1205,16 +1205,30 @@
             alert("✅ 主題已儲存！");
         }
 
+        // --- 修正版：刪除自訂主題 (移除密碼，改為確認視窗) ---
         function deleteCustomTheme() {
             const k = document.getElementById('theme-select').value;
-            if(!k.startsWith('search_')) return alert("無法刪除內建主題");
-            if(prompt("密碼:") !== adminPassword) return alert("錯誤");
+            
+            // 1. 防呆：不能刪除內建主題
+            if(!k.startsWith('search_')) {
+                return alert("無法刪除內建主題");
+            }
+
+            // 2. 改為「確認視窗」，不需要密碼
+            if(!confirm("確定要刪除這個主題嗎？\n(此動作無法復原)")) {
+                return; // 如果按取消，就直接結束
+            }
+
+            // 3. 執行刪除
             delete searchData[k];
-            saveSearchData();
+            saveSearchData(); 
             updateThemeSelect();
-            document.getElementById('theme-select').value = "flags";
+            
+            // 4. 刪完後自動切換回預設主題
+            document.getElementById('theme-select').value = "flags"; 
             saveSettings();
-            alert("已刪除");
+            
+            alert("🗑️ 主題已刪除");
         }
 
         // ============================================
@@ -1795,3 +1809,4 @@
     </script>
 </body>
 </html>
+
