@@ -133,16 +133,21 @@
         .control-row { margin-bottom: 10px; }
         .control-row label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; font-size: 0.9rem; }
         
-        /* 折疊選單 */
+        /* 音樂設定 (子折疊) */
         details.music-settings {
             background: #fff0f6; border: 1px solid #ffadd2; border-radius: 10px; padding: 10px;
         }
-        details.music-settings summary {
+        /* 這裡加了 > */
+        details.music-settings > summary {
             cursor: pointer; font-weight: bold; color: #d63031; outline: none; list-style: none;
+            display: flex; justify-content: space-between; align-items: center;
         }
-        details.music-settings summary::-webkit-details-marker { display: none; }
-        details.music-settings summary::after { content: "+"; font-size: 1.2em; }
-        details.music-settings[open] summary::after { content: "-"; }
+        details.music-settings > summary::-webkit-details-marker { display: none; }
+        
+        /* 這裡也加了 > */
+        details.music-settings > summary::after { content: "+"; font-size: 1.2rem; }
+        details.music-settings[open] > summary::after { content: "-"; }
+
         .sub-control { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ffadd2; }
 
         input[type="range"], input[type="number"], input[type="text"] { width: 100%; padding: 5px; box-sizing: border-box; }
@@ -299,27 +304,30 @@
         .cloud-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .hidden { display: none !important; }
 
-        /* --- ★ 新增：折疊選單樣式 --- */
+        /* --- ★ 修正版：折疊選單樣式 (加入 > 符號，確保內外層獨立) --- */
         details.main-section {
             margin-bottom: 15px;
             border: 1px solid #ddd; border-radius: 12px; overflow: hidden;
             background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-        details.main-section summary {
+        
+        /* 這裡加了 > ，表示只針對最外層的 summary，不會影響裡面的音樂設定 */
+        details.main-section > summary {
             padding: 15px; font-size: 1.1rem; font-weight: bold; color: white;
             cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center;
         }
-        details.main-section summary::-webkit-details-marker { display: none; }
-        details.main-section summary::after { content: '+'; font-size: 1.5rem; font-weight: bold; }
-        details.main-section[open] summary::after { content: '-'; }
+        details.main-section > summary::-webkit-details-marker { display: none; }
+        
+        /* 這裡也加了 > */
+        details.main-section > summary::after { content: '+'; font-size: 1.5rem; font-weight: bold; }
+        details.main-section[open] > summary::after { content: '-'; }
 
         .section-content { padding: 15px; background: #fff; border-top: 1px solid #eee; }
 
-        /* 不同顏色的配色 */
-        .style-theme summary { background: #dd9a1e; }
-        .style-music summary { background: #129e51; }
-        .style-cloud summary { background: #2196f3; }
-        .style-cloud .section-content { background: #e3f2fd; }
+        /* 配色部分也要加 > 以防萬一 */
+        .style-theme > summary { background: #dd9a1e; }
+        .style-music > summary { background: #129e51; }
+        .style-cloud > summary { background: #2196f3; }
 
     </style>
 </head>
@@ -1811,4 +1819,3 @@
     </script>
 </body>
 </html>
-
