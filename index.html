@@ -30,11 +30,19 @@
             background-repeat: no-repeat; background-position: center;
             background-size: cover; background-attachment: fixed;
         }
-        body.has-custom-bg #home-screen, 
-        body.has-custom-bg #game-screen {
+        /* 1. 首頁 (Home) 保持有白框，比較好看 */
+        body.has-custom-bg #home-screen {
             background: rgba(255, 255, 255, 0.9);
             padding: 20px; border-radius: 20px;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        /* 2. ★ 修改：遊戲畫面 (Game) 去掉白框 */
+        body.has-custom-bg #game-screen {
+            background: none;        /* 背景透明 */
+            box-shadow: none;        /* 去掉陰影 */
+            padding: 0;              /* 去掉內距 */
+            border: none;            /* 去掉邊框 */
         }
 
         /* --- 按鈕與通用元件 --- */
@@ -133,8 +141,8 @@
             cursor: pointer; font-weight: bold; color: #d63031; outline: none; list-style: none;
         }
         details.music-settings summary::-webkit-details-marker { display: none; }
-        details.music-settings summary::after { content: " ▼"; font-size: 0.8em; }
-        details.music-settings[open] summary::after { content: " ▲"; }
+        details.music-settings summary::after { content: "+"; font-size: 1.2em; }
+        details.music-settings[open] summary::after { content: "-"; }
         .sub-control { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ffadd2; }
 
         input[type="range"], input[type="number"], input[type="text"] { width: 100%; padding: 5px; box-sizing: border-box; }
@@ -194,22 +202,71 @@
             justify-content: space-between; padding: 0 20px; box-sizing: border-box;
         }
         #info-bar {
-            font-size: 2rem; margin-bottom: 20px; font-weight: 900; color: #555;
-            background: white; padding: 5px 20px; border-radius: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            font-size: 2.5rem;       /* 字稍微加大一點 */
+            margin-bottom: 20px; 
+            font-weight: 900; 
+            color: #333;             /* 字體主色 */
+            
+            /* ★ 修改：去掉白色背景框與陰影 */
+            background: none; 
+            box-shadow: none;
+            padding: 0;
+            border-radius: 0;
+            
+            /* ★ 新增：強力白色描邊 (讓字在任何背景上都清晰可見) */
+            text-shadow: 
+                3px 3px 0 #fff, 
+                -3px -3px 0 #fff, 
+                3px -3px 0 #fff, 
+                -3px 3px 0 #fff,
+                3px 0 0 #fff,
+                -3px 0 0 #fff,
+                0 3px 0 #fff,
+                0 -3px 0 #fff;
         }
+        /* 1. 修改網格容器 (移除強制 2:1 比例，讓它跟隨卡片大小) */
         #grid-container {
-            display: grid; grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(2, 1fr); gap: 15px; width: 95%; aspect-ratio: 2/1;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            /* grid-template-rows: repeat(2, 1fr);  <-- 這行可以拿掉，讓它自動長高 */
+            gap: 15px; 
+            width: 95%;
+            /* aspect-ratio: 2/1; <-- ★ 刪除這行：不要強制長寬比，讓卡片自己撐開 */
+            margin: 0 auto; /* 置中 */
         }
+
+        /* 2. 修改卡片 (強制正方形) */
         .card {
-            background-color: var(--box-bg); border-radius: 12px; display: flex;
-            align-items: center; justify-content: center; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 5px solid #eee;
-            overflow: hidden; position: relative;
+            background-color: var(--box-bg); 
+            border-radius: 12px; 
+            display: flex;
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            border: 5px solid #eee;
+            overflow: hidden; 
+            position: relative;
+            
+            /* ★ 新增：強制變成正方形 */
+            aspect-ratio: 1 / 1;
         }
-        .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card.contain-img img { object-fit: contain; width: 90%; height: 90%; }
+
+        /* 3. 修改圖片 (等比例縮入，不裁切) */
+        .card img { 
+            width: 100%; 
+            height: 100%; 
+            
+            /* ★ 關鍵：contain = 包含 (完整顯示圖片，留白邊，不變形) */
+            object-fit: contain; 
+            
+            /* 選項：加一點內距，讓圖不要貼死邊框，比較好看 */
+            padding: 5px; 
+            box-sizing: border-box;
+            background: white; /* 圖片背景設為白色，這樣留白的地方會是白的 */
+        }
+
+        /* 4. 這一行舊的可以刪掉或保留，因為上面已經統一設定了 */
+        /* .card.contain-img img { object-fit: contain; width: 90%; height: 90%; } */
         .card.active {
             border-color: var(--primary-color) !important; transform: scale(1.05);
             box-shadow: 0 0 30px rgba(255, 71, 87, 0.8); z-index: 5; background-color: #ffeaa7;
@@ -259,8 +316,8 @@
         .section-content { padding: 15px; background: #fff; border-top: 1px solid #eee; }
 
         /* 不同顏色的配色 */
-        .style-blue summary { background: #54a0ff; }
-        .style-purple summary { background: #a55eea; }
+        .style-theme summary { background: #dd9a1e; }
+        .style-music summary { background: #129e51; }
         .style-cloud summary { background: #2196f3; }
         .style-cloud .section-content { background: #e3f2fd; }
 
@@ -303,7 +360,7 @@
                 <button class="close-btn" onclick="closeSettingsBtn()">✕</button>
             </div>
 
-            <details class="main-section style-blue">
+            <details class="main-section style-theme">
                 <summary>🎨 自訂主題與卡片</summary>
                 <div class="section-content">
                     <div style="margin-bottom:8px; display:flex; gap:5px;">
@@ -360,7 +417,7 @@
             </details>
 
 
-            <details class="main-section style-purple">
+            <details class="main-section style-music">
                 <summary>⚙️ 背景與遊戲設定</summary>
                 <div class="section-content">
                 
@@ -546,6 +603,16 @@
         // 內建資料庫
         const flagsData = [{c:'tw',n:'台灣'},{c:'jp',n:'日本'},{c:'us',n:'美國'},{c:'kr',n:'韓國'},{c:'gb',n:'英國'},{c:'fr',n:'法國'},{c:'de',n:'德國'},{c:'cn',n:'中國'},{c:'it',n:'義大利'},{c:'ca',n:'加拿大'},{c:'au',n:'澳洲'},{c:'th',n:'泰國'}];
         const commonData = {
+            pokemon: [
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png', n:'皮卡丘'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png', n:'妙蛙種子'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png', n:'小火龍'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png', n:'傑尼龜'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png', n:'伊布'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/143.png', n:'卡比獸'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/150.png', n:'超夢'},
+                {u:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png', n:'可達鴨'}
+            ],
             animals: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵'],
             numbers: ['1','2','3','4','5','6','7','8','9','10','11','12'],
             colors: [{c:'#ff0000',n:'紅'},{c:'#00ff00',n:'綠'},{c:'#0000ff',n:'藍'},{c:'#ffff00',n:'黃'},{c:'#000000',n:'黑'},{c:'#ffffff',n:'白'}],
@@ -1302,6 +1369,7 @@
                     <option value="colors">🎨 顏色</option>
                     <option value="math">➗ 數學</option>
                     <option value="food">🍔 美食</option>
+                    <option value="pokemon">🐱 寶可夢</option>
                 </optgroup>
             `;
             if(saved && sel.querySelector(`option[value="${saved}"]`)) sel.value = saved;
@@ -1312,7 +1380,13 @@
         function closeSettings(e) { if(e.target.id==='settings-modal') closeSettingsBtn(); }
         
         function goHome() {
+            // ★ 新增：強制中止遊戲迴圈，防止背景繼續跑
+            if(gameState.abortController) gameState.abortController.abort();
+            
+            // ★ 新增：重置音樂進度
             bgmAudio.pause();
+            bgmAudio.currentTime = 0;
+
             document.getElementById('game-screen').style.display = 'none';
             document.getElementById('end-screen').style.display = 'none';
             document.getElementById('home-screen').style.display = 'flex';
@@ -1468,6 +1542,60 @@
         // ============================================
         // 7. 遊戲核心邏輯
         // ============================================
+        // --- ★ 新增：從 API 隨機抓取寶可夢 (支援中文名) ---
+        async function fetchRandomPokemonPool(count) {
+            const btn = document.querySelector('.btn-primary'); // 取得開始按鈕
+            const oldText = btn.innerText;
+            btn.innerText = "🔍 正在召喚寶可夢..."; // 顯示載入中
+            btn.disabled = true;
+
+            const newPool = [];
+            const usedIds = new Set();
+            
+            // 隨機產生 ID (避開重複)
+            while(newPool.length < count) {
+                // 目前圖鑑約到 1025 號
+                const id = Math.floor(Math.random() * 1025) + 1; 
+                if(!usedIds.has(id)) {
+                    usedIds.add(id);
+                    newPool.push(id);
+                }
+            }
+
+            // 同步發送請求 (加快速度)
+            try {
+                const promises = newPool.map(async (id) => {
+                    // 1. 抓取中文名稱 (Species API)
+                    const res = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}`);
+                    const data = await res.json();
+                    
+                    // 2. 找到繁體中文 (zh-Hant) 或 簡體 (zh-Hans) 或 日文 (ja)
+                    let nameObj = data.names.find(n => n.language.name === 'zh-Hant');
+                    if(!nameObj) nameObj = data.names.find(n => n.language.name === 'zh-Hans');
+                    if(!nameObj) nameObj = data.names.find(n => n.language.name === 'ja'); // 沒中文就用日文
+                    const name = nameObj ? nameObj.name : `No.${id}`;
+
+                    // 3. 圖片網址 (直接用 ID 拼湊，不用再 fetch)
+                    const img = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+
+                    return { content: img, label: name };
+                });
+
+                const results = await Promise.all(promises);
+                btn.innerText = oldText;
+                btn.disabled = false;
+                return results;
+
+            } catch (e) {
+                console.error("抓寶失敗", e);
+                alert("網路連線問題，將使用內建備用清單");
+                btn.innerText = oldText;
+                btn.disabled = false;
+                return null; // 失敗回傳 null，會自動切換回內建清單
+            }
+        }
+
+        // --- 修正版：開始遊戲 (整合隨機寶可夢 API) ---
         async function startGame() {
             gameState.maxRounds = parseInt(document.getElementById('round-select').value);
             gameState.selectedTheme = document.getElementById('theme-select').value;
@@ -1482,9 +1610,26 @@
             gameState.round = 0; gameState.abortController = new AbortController(); gameState.history = [];
             
             let theme = gameState.selectedTheme;
-            if(theme === 'random_locked') theme = getRandomTheme();
             
-            if(theme !== 'random_mixed' && theme !== 'random_round') gameState.activePool = initPool(theme);
+            // 處理隨機主題邏輯
+            if(theme === 'random_locked') theme = getRandomTheme();
+
+            // ★★★ 關鍵修改區塊：如果是寶可夢，直接從 API 抓新的 ★★★
+            if (theme === 'pokemon') {
+                // 嘗試從 API 抓 8 隻新的
+                // 如果抓失敗 (例如沒網路)，會回傳 null，那就跑下面的 initPool 用內建的
+                const apiPool = await fetchRandomPokemonPool(8);
+                if (apiPool) {
+                    gameState.activePool = apiPool;
+                } else {
+                    gameState.activePool = initPool('pokemon');
+                }
+            } else if (theme !== 'random_mixed' && theme !== 'random_round') {
+                // 其他普通主題
+                gameState.activePool = initPool(theme);
+            }
+            // ★★★ 修改結束 ★★★
+
             gameState.currentRunTheme = theme;
 
             bgmAudio.muted = gameState.isMuted;
@@ -1495,7 +1640,7 @@
             document.getElementById('game-screen').style.display='flex';
             document.getElementById('total-rounds').innerText = gameState.maxRounds;
             
-            startRec();
+            startRec(); 
             runLoop();
         }
 
